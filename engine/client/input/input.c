@@ -63,7 +63,8 @@ static struct
 	qboolean was_enabled;      // was enabled on the previous move
 	qboolean was_on_ground;    // were we touching the ground last move
 	qboolean armed;            // may we still tap duck on the next landing
-	qboolean release_duck;     // duck was tapped, drop it on the next move
+	qboolean release_duck;     // duck was tapped, drop it once it has been sent
+	int         duck_cmd_seq;  // outgoing_sequence the tap was stamped on
 } gs_state;
 
 static void IN_GroundStrafe_f( void );
@@ -681,14 +682,27 @@ static void IN_GroundStrafe( usercmd_t *cmd, float ground_dist )
 
 	if( gs_state.release_duck )
 	{
-		cmd->buttons &= ~IN_DUCK;
-		gs_state.release_duck = false;
+		// Only one command per tick actually reaches the server, and it is
+		// whichever one was generated last before the send. At high frame
+		// rates a one-move tap is therefore almost always thrown away before
+		// it is ever transmitted, which is why +gs appeared to do nothing.
+		// Hold duck until the command we stamped has gone out.
+		if( cls.netchan.outgoing_sequence != gs_state.duck_cmd_seq )
+		{
+			cmd->buttons &= ~IN_DUCK;
+			gs_state.release_duck = false;
+		}
+		else
+		{
+			cmd->buttons |= IN_DUCK;
+		}
 	}
 
 	if( activated_this_move && on_ground )
 	{
 		cmd->buttons |= IN_DUCK;
 		gs_state.release_duck = true;
+		gs_state.duck_cmd_seq = cls.netchan.outgoing_sequence;
 		gs_state.armed = true;
 	}
 	else if( on_ground && !gs_state.was_on_ground )
@@ -697,6 +711,7 @@ static void IN_GroundStrafe( usercmd_t *cmd, float ground_dist )
 		{
 			cmd->buttons |= IN_DUCK;
 			gs_state.release_duck = true;
+			gs_state.duck_cmd_seq = cls.netchan.outgoing_sequence;
 		}
 		else
 		{
