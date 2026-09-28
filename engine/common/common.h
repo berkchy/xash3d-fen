@@ -831,6 +831,7 @@ void Cmd_Null_f( void );
 void Rcon_Print( host_redirect_t *rd, const char *pMsg );
 qboolean COM_ParseVector( char **pfile, float *v, size_t size );
 int COM_FileSize( const char *filename );
+const char *COM_DownloadCachePath( char *buf, size_t size, const char *path, qboolean incomplete );
 void COM_FreeFile( void *buffer );
 int pfnCompareFileTime( const char *path1, const char *path2, int *retval );
 char *va( const char *format, ... ) FORMAT_CHECK( 1 ) RETURNS_NONNULL;

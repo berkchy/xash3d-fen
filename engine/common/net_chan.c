@@ -1252,7 +1252,7 @@ qboolean Netchan_CopyFileFragments( netchan_t *chan, sizebuf_t *msg )
 	if( filename[0] != '!' )
 	{
 		string write_path;
-		Q_snprintf( write_path, sizeof( write_path ), "../%s" DEFAULT_DOWNLOADED_DIRECTORY_SUFFIX "/%s", GI->gamefolder, filename );
+		COM_DownloadCachePath( write_path, sizeof( write_path ), filename, false );
 		Q_strncpy( filename, write_path, sizeof( filename ));
 
 		FS_AllowDirectPaths( true );

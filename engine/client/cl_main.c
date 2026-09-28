@@ -2676,11 +2676,21 @@ static void CL_ServerList( netadr_t from, sizebuf_t *msg )
 		CL_QueryServer( servadr, proto );
 	}
 
-	if( cls.internetservers_pending )
-	{
-		UI_ResetPing();
-		cls.internetservers_pending = false;
-	}
+	CL_NotifyServerListResponse();
+}
+
+/*
+=================
+CL_NotifyServerListResponse
+=================
+*/
+void CL_NotifyServerListResponse( void )
+{
+	if( !cls.internetservers_pending )
+		return;
+
+	UI_ResetPing();
+	cls.internetservers_pending = false;
 }
 
 /*
