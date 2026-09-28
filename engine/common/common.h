@@ -102,9 +102,9 @@ typedef enum instance_e
 #endif
 
 // PERFORMANCE INFO
-#define MIN_FPS         20.0f    // host minimum fps value for maxfps.
-#define MAX_FPS_SOFT    200.0f   // soft limit for maxfps.
-#define MAX_FPS_HARD    1000.0f  // multiplayer hard limit for maxfps.
+#define MIN_FPS         1.0f     // host minimum fps value for maxfps.
+#define MAX_FPS_SOFT    10000.0f // soft limit for maxfps (user-requested).
+#define MAX_FPS_HARD    10000.0f // hard limit for maxfps (user-requested).
 #define HOST_FPS		100.0f		// multiplayer games typical fps
 
 #define MAX_FRAMETIME	0.25f
@@ -155,6 +155,7 @@ extern convar_t	host_developer;
 extern convar_t	host_limitlocal;
 extern convar_t	host_maxfps;
 extern convar_t	fps_override;
+extern convar_t	host_skipframes;
 extern convar_t	sys_timescale;
 extern convar_t	cl_filterstuffcmd;
 extern convar_t	rcon_password;

@@ -3779,8 +3779,15 @@ void Host_ClientFrame( void )
 	// catch changes video settings
 	VID_CheckChanges();
 
-	// update the screen
-	SCR_UpdateScreen ();
+	// update the screen (skip render frames when host_skipframes is enabled)
+	if( host_skipframes.value > 0.0f && ( host.framecount & 1 ))
+	{
+		// skip this render frame to keep game logic at full speed
+	}
+	else
+	{
+		SCR_UpdateScreen ();
+	}
 
 	// update audio
 	SND_UpdateSound ();
