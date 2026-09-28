@@ -54,6 +54,7 @@ CVAR_DEFINE_AUTO( touch_enable, DEFAULT_TOUCH_ENABLE, FCVAR_ARCHIVE | FCVAR_FILT
 
 CVAR_DEFINE_AUTO( bhop_assist, "1", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "bunny hop assist, release jump at the right height (0=off, 1=on)" );
 CVAR_DEFINE_AUTO( bhop_ground_dist, "37.7", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "height above ground at which bunny hop releases jump" );
+CVAR_DEFINE_AUTO( bhop_debug, "0", FCVAR_ARCHIVE, "print ground distance and +gs state once a second" );
 
 // state for +gs, see IN_GroundStrafe
 static struct
@@ -459,6 +460,7 @@ void IN_Init( void )
 	Cvar_RegisterVariable( &cl_sidespeed );
 	Cvar_RegisterVariable( &bhop_assist );
 	Cvar_RegisterVariable( &bhop_ground_dist );
+	Cvar_RegisterVariable( &bhop_debug );
 
 	Cmd_AddCommand( "+gs", IN_GroundStrafe_f, "ground strafe, tap duck on landing" );
 	Cmd_AddCommand( "-gs", IN_GroundStrafeEnd_f, "stop ground strafe" );
@@ -602,6 +604,50 @@ static void IN_CollectInput( float *forward, float *side, float *pitch, float *y
 
 /*
 ================
+IN_GroundDistance
+
+How far the floor is below the local player, traced straight down. Returns -1
+when no floor was found within MAX_GROUND_DIST.
+
+This is what the movement assists key off, rather than cl.local.onground.
+cl.local.onground is written by the prediction pass, which runs *after* this
+hook, so at high tickrates there are frames with nothing to predict and it
+reads back as -1 (airborne) even while standing still on the floor.
+
+CL_TraceLine() is the engine's own simple trace (see CL_SetIdealPitch) and is
+what we want here: it uses hull 2 like the original client code did, converts
+to trace space itself, and PM_STUDIO_IGNORE keeps the local player from being
+reported as its own floor.
+================
+*/
+#define MAX_GROUND_DIST 64.0f
+
+static float IN_GroundDistance( void )
+{
+	vec3_t start, end;
+
+	VectorCopy( cl.simorg, start );
+	VectorCopy( cl.simorg, end );
+	start[2] += 1.0f;
+	end[2] -= MAX_GROUND_DIST;
+
+	const pmtrace_t tr = CL_TraceLine( start, end, PM_STUDIO_IGNORE );
+
+	if( tr.fraction >= 1.0f || tr.allsolid || tr.startsolid )
+		return -1.0f;
+
+	// how far below the origin the floor ended up
+	return MAX_GROUND_DIST - tr.fraction * ( MAX_GROUND_DIST + 1.0f );
+}
+
+// close enough to the floor that the next step down would put us on it
+static qboolean IN_IsOnGround( float ground_dist )
+{
+	return ground_dist >= 0.0f && ground_dist <= 1.0f;
+}
+
+/*
+================
 IN_GroundStrafe
 
 "+gs" taps duck for a single move when the player lands, which is the timing
@@ -609,9 +655,9 @@ GoldSrc wants to get the best acceleration out of a jump. Pressing it while
 already airborne only arms it, the first landing afterwards is left alone.
 ================
 */
-static void IN_GroundStrafe( usercmd_t *cmd )
+static void IN_GroundStrafe( usercmd_t *cmd, float ground_dist )
 {
-	const qboolean on_ground = (cl.local.onground != -1);
+	const qboolean on_ground = IN_IsOnGround( ground_dist );
 
 	if( !cmd || !gs_state.enabled )
 	{
@@ -673,57 +719,36 @@ static void IN_GroundStrafe( usercmd_t *cmd )
 
 /*
 ================
-IN_IsNearGround
-
-Is there floor within `distance` units below the local player? Traces down
-from just above the predicted origin, ignoring the local player itself.
-================
-*/
-static qboolean IN_IsNearGround( float distance )
-{
-	if( !clgame.pmove || !clgame.pmove->PM_TraceLine )
-		return false;
-
-	const float trace_dist = distance > 4.0f ? distance : 4.0f;
-	vec3_t start, end;
-
-	VectorCopy( cl.simorg, start );
-	VectorCopy( cl.simorg, end );
-	start[2] += 1.0f;
-	end[2] -= trace_dist;
-
-	const pmtrace_t *tr = clgame.pmove->PM_TraceLine( start, end, PM_TRACELINE_PHYSENTSONLY, 2, cl.playernum );
-	if( !tr )
-		return false;
-
-	return tr->fraction < 1.0f && !tr->allsolid;
-}
-
-/*
-================
 IN_BunnyHop
 
 Hold jump while airborne, but let go of it once we are high enough above the
-ground, so the next jump is timed on landing instead of floating.
+floor, so the next jump is timed on landing instead of floating.
 ================
 */
-static void IN_BunnyHop( usercmd_t *cmd )
+static void IN_BunnyHop( usercmd_t *cmd, float ground_dist )
 {
 	if( !cmd || !(cmd->buttons & IN_JUMP) )
 		return;
 
-	if( cl.local.onground != -1 )
+	if( IN_IsOnGround( ground_dist ))
+		return;
+
+	// nothing within reach of the floor, no idea how high we are - don't touch
+	// jump, guessing here is what makes the player unable to jump at all
+	if( ground_dist < 0.0f )
 		return;
 
 	const qboolean assist = bhop_assist.value >= 0.5f;
-	float ground_dist = bhop_ground_dist.value;
+	float limit = bhop_ground_dist.value;
 
-	if( ground_dist < 4.0f ) ground_dist = 4.0f;
-	if( ground_dist > 64.0f ) ground_dist = 64.0f;
+	if( limit < 4.0f ) limit = 4.0f;
+	if( limit > MAX_GROUND_DIST ) limit = MAX_GROUND_DIST;
 
-	if( assist && IN_IsNearGround( ground_dist ))
+	if( assist && ground_dist <= limit )
 		return;
 
+	// kept identical to the client implementation, which clears jump in both
+	// the assist and the no-assist branch
 	cmd->buttons &= ~IN_JUMP;
 }
 
@@ -769,8 +794,24 @@ void IN_EngineAppendMove( float frametime, usercmd_t *cmd, qboolean active )
 			VectorCopy( cmd->viewangles, cl.viewangles );
 		}
 
-		IN_GroundStrafe( cmd );
-		IN_BunnyHop( cmd );
+		// one trace per move, shared by both assists
+		const float ground_dist = IN_GroundDistance();
+
+		IN_GroundStrafe( cmd, ground_dist );
+		IN_BunnyHop( cmd, ground_dist );
+
+		if( bhop_debug.value > 0.5f )
+		{
+			static double next_report;
+			if( host.realtime >= next_report )
+			{
+				next_report = host.realtime + 1.0;
+				Con_Printf( "bhop: dist=%.1f ground=%d pred_onground=%d jump=%d duck=%d gs=%d armed=%d\n",
+					ground_dist, IN_IsOnGround( ground_dist ), cl.local.onground != -1,
+					!!(cmd->buttons & IN_JUMP), !!(cmd->buttons & IN_DUCK),
+					gs_state.enabled, gs_state.armed );
+			}
+		}
 	}
 	else
 	{
@@ -779,7 +820,7 @@ void IN_EngineAppendMove( float frametime, usercmd_t *cmd, qboolean active )
 		gs_state.was_enabled = false;
 		gs_state.armed = false;
 		gs_state.release_duck = false;
-		gs_state.was_on_ground = (cl.local.onground != -1);
+		gs_state.was_on_ground = false;
 	}
 }
 
