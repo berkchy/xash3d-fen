@@ -1,5 +1,5 @@
 name: Build & Deploy Engine
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 jobs:
 #  cleanup:
 #    runs-on: self-hosted
