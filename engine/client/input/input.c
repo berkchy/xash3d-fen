@@ -52,6 +52,22 @@ static CVAR_DEFINE_AUTO( cl_sidespeed, "400", FCVAR_ARCHIVE | FCVAR_CLIENTDLL | 
 static CVAR_DEFINE_AUTO( m_grab_debug, "0", FCVAR_PRIVILEGED, "show debug messages on mouse state change" );
 CVAR_DEFINE_AUTO( touch_enable, DEFAULT_TOUCH_ENABLE, FCVAR_ARCHIVE | FCVAR_FILTERABLE, "enable touch controls" );
 
+CVAR_DEFINE_AUTO( bhop_assist, "1", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "bunny hop assist, release jump at the right height (0=off, 1=on)" );
+CVAR_DEFINE_AUTO( bhop_ground_dist, "37.7", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "height above ground at which bunny hop releases jump" );
+
+// state for +gs, see IN_GroundStrafe
+static struct
+{
+	qboolean enabled;          // +gs is held
+	qboolean was_enabled;      // was enabled on the previous move
+	qboolean was_on_ground;    // were we touching the ground last move
+	qboolean armed;            // may we still tap duck on the next landing
+	qboolean release_duck;     // duck was tapped, drop it on the next move
+} gs_state;
+
+static void IN_GroundStrafe_f( void );
+static void IN_GroundStrafeEnd_f( void );
+
 /*
 ================
 IN_CollectInputDevices
@@ -425,6 +441,9 @@ void IN_Shutdown( void )
 #endif
 
 	Touch_Shutdown();
+
+	Cmd_RemoveCommand( "+gs" );
+	Cmd_RemoveCommand( "-gs" );
 }
 
 
@@ -438,6 +457,11 @@ void IN_Init( void )
 	Cvar_RegisterVariable( &cl_forwardspeed );
 	Cvar_RegisterVariable( &cl_backspeed );
 	Cvar_RegisterVariable( &cl_sidespeed );
+	Cvar_RegisterVariable( &bhop_assist );
+	Cvar_RegisterVariable( &bhop_ground_dist );
+
+	Cmd_AddCommand( "+gs", IN_GroundStrafe_f, "ground strafe, tap duck on landing" );
+	Cmd_AddCommand( "-gs", IN_GroundStrafeEnd_f, "stop ground strafe" );
 
 	if( !Host_IsDedicated() )
 	{
@@ -578,6 +602,143 @@ static void IN_CollectInput( float *forward, float *side, float *pitch, float *y
 
 /*
 ================
+IN_GroundStrafe
+
+"+gs" taps duck for a single move when the player lands, which is the timing
+GoldSrc wants to get the best acceleration out of a jump. Pressing it while
+already airborne only arms it, the first landing afterwards is left alone.
+================
+*/
+static void IN_GroundStrafe( usercmd_t *cmd )
+{
+	const qboolean on_ground = (cl.local.onground != -1);
+
+	if( !cmd || !gs_state.enabled )
+	{
+		// let the state follow the ground while the feature is off, so that
+		// pressing +gs does not look like a landing
+		gs_state.was_on_ground = on_ground;
+		gs_state.was_enabled = false;
+		gs_state.armed = false;
+		gs_state.release_duck = false;
+		return;
+	}
+
+	// the very first move after +gs was pressed
+	const qboolean activated_this_move = !gs_state.was_enabled;
+
+	if( !gs_state.was_enabled )
+	{
+		// ignore mid-air activation, only arm immediately if +gs was pressed on ground
+		gs_state.armed = on_ground;
+	}
+
+	if( gs_state.release_duck )
+	{
+		cmd->buttons &= ~IN_DUCK;
+		gs_state.release_duck = false;
+	}
+
+	if( activated_this_move && on_ground )
+	{
+		cmd->buttons |= IN_DUCK;
+		gs_state.release_duck = true;
+		gs_state.armed = true;
+	}
+	else if( on_ground && !gs_state.was_on_ground )
+	{
+		if( gs_state.armed )
+		{
+			cmd->buttons |= IN_DUCK;
+			gs_state.release_duck = true;
+		}
+		else
+		{
+			// first landing after enabling in air should not trigger the tap
+			gs_state.armed = true;
+		}
+	}
+	else if( on_ground )
+	{
+		gs_state.armed = true;
+	}
+	else if( !gs_state.release_duck )
+	{
+		cmd->buttons &= ~IN_DUCK;
+	}
+
+	gs_state.was_enabled = true;
+	gs_state.was_on_ground = on_ground;
+}
+
+/*
+================
+IN_IsNearGround
+
+Is there floor within `distance` units below the local player? Traces down
+from just above the predicted origin, ignoring the local player itself.
+================
+*/
+static qboolean IN_IsNearGround( float distance )
+{
+	if( !clgame.pmove || !clgame.pmove->PM_TraceLine )
+		return false;
+
+	const float trace_dist = distance > 4.0f ? distance : 4.0f;
+	vec3_t start, end;
+
+	VectorCopy( cl.simorg, start );
+	VectorCopy( cl.simorg, end );
+	start[2] += 1.0f;
+	end[2] -= trace_dist;
+
+	const pmtrace_t *tr = clgame.pmove->PM_TraceLine( start, end, PM_TRACELINE_PHYSENTSONLY, 2, cl.playernum );
+	if( !tr )
+		return false;
+
+	return tr->fraction < 1.0f && !tr->allsolid;
+}
+
+/*
+================
+IN_BunnyHop
+
+Hold jump while airborne, but let go of it once we are high enough above the
+ground, so the next jump is timed on landing instead of floating.
+================
+*/
+static void IN_BunnyHop( usercmd_t *cmd )
+{
+	if( !cmd || !(cmd->buttons & IN_JUMP) )
+		return;
+
+	if( cl.local.onground != -1 )
+		return;
+
+	const qboolean assist = bhop_assist.value >= 0.5f;
+	float ground_dist = bhop_ground_dist.value;
+
+	if( ground_dist < 4.0f ) ground_dist = 4.0f;
+	if( ground_dist > 64.0f ) ground_dist = 64.0f;
+
+	if( assist && IN_IsNearGround( ground_dist ))
+		return;
+
+	cmd->buttons &= ~IN_JUMP;
+}
+
+static void IN_GroundStrafe_f( void )
+{
+	gs_state.enabled = true;
+}
+
+static void IN_GroundStrafeEnd_f( void )
+{
+	gs_state.enabled = false;
+}
+
+/*
+================
 IN_EngineAppendMove
 
 Called from cl_main.c after generating command in client
@@ -607,6 +768,18 @@ void IN_EngineAppendMove( float frametime, usercmd_t *cmd, qboolean active )
 			cmd->viewangles[PITCH] = bound( -90, cmd->viewangles[PITCH], 90 );
 			VectorCopy( cmd->viewangles, cl.viewangles );
 		}
+
+		IN_GroundStrafe( cmd );
+		IN_BunnyHop( cmd );
+	}
+	else
+	{
+		// dropped out of the game, forget the +gs state so the next spawn
+		// doesn't look like a landing
+		gs_state.was_enabled = false;
+		gs_state.armed = false;
+		gs_state.release_duck = false;
+		gs_state.was_on_ground = (cl.local.onground != -1);
 	}
 }
 
