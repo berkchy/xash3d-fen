@@ -190,6 +190,36 @@ void FS_AddGameDirectory( const char *dir, uint flags )
 {
 	stringlist_t list;
 	searchpath_t *search;
+	char norm[MAX_SYSPATH];
+
+	// Mounting a directory means listing it and opening every archive inside it.
+	// On slow storage (emulated sdcard on Android) that is by far the most
+	// expensive part of loading a map, and the client asks for the whole game
+	// hierarchy again on every level change through
+	// COM_AddAppDirectoryToSearchPath(). Skip the work when this directory is
+	// already mounted, instead of piling up duplicate search paths.
+	Q_strncpy( norm, dir, sizeof( norm ) - 1 );
+	norm[sizeof( norm ) - 1] = '\0';
+	COM_PathSlashFix( norm ); // stored paths always carry a trailing slash
+
+	for( search = fs_searchpaths; search; search = search->next )
+	{
+		if( search->type != SEARCHPATH_PLAIN && search->type != SEARCHPATH_PK3DIR )
+			continue;
+
+		if( Q_stricmp( search->filename, norm ))
+			continue;
+
+		// already mounted, only make sure we still hand out the write path
+		// when this call is the one that is allowed to write
+		if( !FBitSet( flags, FS_NOWRITE_PATH ))
+		{
+			ClearBits( search->flags, FS_NOWRITE_PATH );
+			fs_writepath = search;
+		}
+
+		return;
+	}
 
 	stringlistinit( &list );
 	listdirectory( &list, dir, false );
