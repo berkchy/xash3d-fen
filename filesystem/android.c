@@ -295,6 +295,28 @@ searchpath_t *FS_AddAndroidAssets_Fullpath( const char *path, int flags )
 		return NULL;
 	}
 
+	// Most builds ship no assets at all, the game data lives in plain directories.
+	// This search path is registered before the plain directory, so every single
+	// file lookup would go through AAssetManager_open() (a JNI call that really
+	// opens the asset) only to fail, and a map load does thousands of lookups.
+	// Bail out early when the asset tree is empty, and keep the lookup free.
+	{
+		stringlist_t probe;
+
+		stringlistinit( &probe );
+		Android_ListDirectory( &probe, "", engine );
+
+		if( !probe.numstrings )
+		{
+			Con_Reportf( "%s: no assets packaged, skipping asset search path\n", __func__ );
+			stringlistfreecontents( &probe );
+			FS_CloseAndroidAssets( assets );
+			return NULL;
+		}
+
+		stringlistfreecontents( &probe );
+	}
+
 	Q_strncpy( assets->package_name, Android_GetPackageName( engine ), sizeof( assets->package_name ));
 
 	search = Mem_Calloc( fs_mempool, sizeof( *search ));
