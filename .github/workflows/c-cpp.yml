@@ -20,8 +20,9 @@ jobs:
             targetarch: i386
     env:
       SDL_VERSION: 2.32.10
-      # the latest FWGS/FFmpeg-Builds release only publishes 9.0, 8.1 is gone
-      FFMPEG_VERSION: 9.0
+      # the latest FWGS/FFmpeg-Builds release only publishes 9.0, 8.1 is gone.
+      # quoted, unquoted 9.0 is a yaml float and reaches the script as "9"
+      FFMPEG_VERSION: "9.0"
       GH_CPU_ARCH: ${{ matrix.targetarch }}
       GH_CPU_OS: ${{ matrix.targetos }}
       GH_CROSSCOMPILING: ${{ matrix.cross }}
