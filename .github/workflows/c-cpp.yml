@@ -20,9 +20,11 @@ jobs:
             targetarch: i386
     env:
       SDL_VERSION: 2.32.10
-      # the latest FWGS/FFmpeg-Builds release only publishes 9.0, 8.1 is gone.
-      # quoted, unquoted 9.0 is a yaml float and reaches the script as "9"
-      FFMPEG_VERSION: "9.0"
+      # this engine revision supports ffmpeg 8.x (libavutil major 60). upstream has
+      # since moved to 9.0 and bumped the SUPPORTED_* checks in avi_ffmpeg.h to
+      # match, which is not backported here. deps_win32.sh skips ffmpeg when the
+      # archive is unavailable, so the build below has no video support.
+      FFMPEG_VERSION: "8.0"
       GH_CPU_ARCH: ${{ matrix.targetarch }}
       GH_CPU_OS: ${{ matrix.targetos }}
       GH_CROSSCOMPILING: ${{ matrix.cross }}
