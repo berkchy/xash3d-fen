@@ -20,7 +20,8 @@ jobs:
             targetarch: i386
     env:
       SDL_VERSION: 2.32.10
-      FFMPEG_VERSION: 8.1
+      # the latest FWGS/FFmpeg-Builds release only publishes 9.0, 8.1 is gone
+      FFMPEG_VERSION: 9.0
       GH_CPU_ARCH: ${{ matrix.targetarch }}
       GH_CPU_OS: ${{ matrix.targetos }}
       GH_CROSSCOMPILING: ${{ matrix.cross }}
