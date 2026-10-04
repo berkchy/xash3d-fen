@@ -607,8 +607,13 @@ static void IN_CollectInput( float *forward, float *side, float *pitch, float *y
 ================
 IN_GroundDistance
 
-How far the floor is below the local player, traced straight down. Returns -1
-when no floor was found within MAX_GROUND_DIST.
+How far the floor is below the local player's feet, traced straight down.
+Returns -1 when no floor was found within MAX_GROUND_DIST.
+
+GoldSrc keeps the origin in the middle of the standing hull, so the feet are
+36 units below it (18 when ducked). The trace starts a unit above the feet so
+the result reads 0 exactly on the floor, which is what IN_IsOnGround and the
+bhop release height key off.
 
 This is what the movement assists key off, rather than cl.local.onground.
 cl.local.onground is written by the prediction pass, which runs *after* this
@@ -623,13 +628,15 @@ reported as its own floor.
 */
 #define MAX_GROUND_DIST 64.0f
 
-static float IN_GroundDistance( void )
+static float IN_GroundDistance( qboolean ducking )
 {
 	vec3_t start, end;
 
+	const float bottom = ducking ? 18.0f : 36.0f;
+
 	VectorCopy( cl.simorg, start );
-	VectorCopy( cl.simorg, end );
-	start[2] += 1.0f;
+	start[2] -= bottom - 1.0f;
+	VectorCopy( start, end );
 	end[2] -= MAX_GROUND_DIST;
 
 	const pmtrace_t tr = CL_TraceLine( start, end, PM_STUDIO_IGNORE );
@@ -637,8 +644,8 @@ static float IN_GroundDistance( void )
 	if( tr.fraction >= 1.0f || tr.allsolid || tr.startsolid )
 		return -1.0f;
 
-	// how far below the origin the floor ended up
-	return MAX_GROUND_DIST - tr.fraction * ( MAX_GROUND_DIST + 1.0f );
+	// distance from the feet to the floor
+	return tr.fraction * MAX_GROUND_DIST - 1.0f;
 }
 
 // close enough to the floor that the next step down would put us on it
@@ -809,22 +816,29 @@ void IN_EngineAppendMove( float frametime, usercmd_t *cmd, qboolean active )
 			VectorCopy( cmd->viewangles, cl.viewangles );
 		}
 
-		// one trace per move, shared by both assists
-		const float ground_dist = IN_GroundDistance();
-
-		IN_GroundStrafe( cmd, ground_dist );
-		IN_BunnyHop( cmd, ground_dist );
-
-		if( bhop_debug.value > 0.5f )
+		// one trace per move, shared by both assists. The duck state comes
+		// from the command the client built, i.e. before GroundStrafe
+		// touches it, so the trace starts at the right height.
+		// Swimming is left alone: with no floor in reach the trace says
+		// nothing either, but in shallow water it would steal +jump.
+		if( cl.local.waterlevel < 2 )
 		{
-			static double next_report;
-			if( host.realtime >= next_report )
+			const float ground_dist = IN_GroundDistance( cmd->buttons & IN_DUCK );
+
+			IN_GroundStrafe( cmd, ground_dist );
+			IN_BunnyHop( cmd, ground_dist );
+
+			if( bhop_debug.value > 0.5f )
 			{
-				next_report = host.realtime + 1.0;
-				Con_Printf( "bhop: dist=%.1f ground=%d pred_onground=%d jump=%d duck=%d gs=%d armed=%d\n",
-					ground_dist, IN_IsOnGround( ground_dist ), cl.local.onground != -1,
-					!!(cmd->buttons & IN_JUMP), !!(cmd->buttons & IN_DUCK),
-					gs_state.enabled, gs_state.armed );
+				static double next_report;
+				if( host.realtime >= next_report )
+				{
+					next_report = host.realtime + 1.0;
+					Con_Printf( "bhop: dist=%.1f ground=%d pred_onground=%d jump=%d duck=%d gs=%d armed=%d\n",
+						ground_dist, IN_IsOnGround( ground_dist ), cl.local.onground != -1,
+						!!(cmd->buttons & IN_JUMP), !!(cmd->buttons & IN_DUCK),
+						gs_state.enabled, gs_state.armed );
+				}
 			}
 		}
 	}
