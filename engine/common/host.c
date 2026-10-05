@@ -655,16 +655,40 @@ void Host_Frame( double time )
 	if( host.framecount == 0 )
 		Con_DPrintf( "Time to first frame: %.3f seconds\n", t1 - host.starttime );
 
-	Host_InputFrame ();  // input frame
-	Host_ClientBegin (); // begin client
-	Host_GetCommands (); // dedicated in
-	Host_ServerFrame (); // server frame
-	Host_ClientFrame (); // client frame
-	HTTP_Run();			 // both server and client
-	XRcon_Frame();
+	// Temporary frame profiling: adding a bot on a phone made the game stutter
+	// and nothing in the log said where the time went, so every stage gets
+	// timed and a frame over the threshold says which one was slow. Gated by
+	// host_profile so a normal run prints nothing.
+	const qboolean profile = Cvar_GetValue( "host_profile" ) != 0.0f;
+	const char *slowest = "none";
+	float worst = 0.0f;
+
+	#define HOST_PROFILE_STAGE( name, call ) \
+		do { \
+			double stageStart = Platform_DoubleTime(); \
+			call; \
+			float stageMs = (float)(( Platform_DoubleTime() - stageStart ) * 1000.0); \
+			if( stageMs > worst ) { worst = stageMs; slowest = name; } \
+			if( profile && stageMs > 50.0f ) \
+				Con_Printf( S_YELLOW "slow stage %s: %.1f ms\n" S_DEFAULT, name, stageMs ); \
+		} while( 0 )
+
+	HOST_PROFILE_STAGE( "input", Host_InputFrame() );
+	HOST_PROFILE_STAGE( "client-begin", Host_ClientBegin() );
+	HOST_PROFILE_STAGE( "commands", Host_GetCommands() );
+	HOST_PROFILE_STAGE( "server", Host_ServerFrame() );
+	HOST_PROFILE_STAGE( "client", Host_ClientFrame() );
+	HOST_PROFILE_STAGE( "http", HTTP_Run() );
+	HOST_PROFILE_STAGE( "rcon", XRcon_Frame() );
+
+	#undef HOST_PROFILE_STAGE
 
 	host.framecount++;
 	host.pureframetime = Platform_DoubleTime() - t1;
+
+	if( profile && host.pureframetime > 0.05f )
+		Con_Printf( S_YELLOW "slow frame %d: %.1f ms total (worst stage: %s %.1f ms)\n"
+			S_DEFAULT, host.framecount, host.pureframetime * 1000.0f, slowest, worst );
 }
 
 /*
