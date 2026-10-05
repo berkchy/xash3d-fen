@@ -154,6 +154,7 @@ extern convar_t	host_allow_materials;
 extern convar_t	host_developer;
 extern convar_t	host_limitlocal;
 extern convar_t	host_maxfps;
+extern convar_t	host_profile;
 extern convar_t	fps_override;
 extern convar_t	host_skipframes;
 extern convar_t	sys_timescale;

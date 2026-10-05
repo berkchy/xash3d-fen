@@ -75,6 +75,7 @@ static CVAR_DEFINE_AUTO( host_gameloaded, "0", FCVAR_READ_ONLY, "inidcates a loa
 static CVAR_DEFINE_AUTO( host_clientloaded, "0", FCVAR_READ_ONLY, "inidcates a loaded client.dll" );
 CVAR_DEFINE_AUTO( host_limitlocal, "0", 0, "apply cl_cmdrate and rate to loopback connection" );
 CVAR_DEFINE( host_maxfps, "fps_max", "72", FCVAR_ARCHIVE|FCVAR_FILTERABLE, "host fps upper limit" );
+CVAR_DEFINE( host_profile, "host_profile", "0", FCVAR_NONE, "print a line for host frames slower than 50 ms" );
 CVAR_DEFINE_AUTO( fps_override, "0", FCVAR_FILTERABLE, "unlock higher framerate values, not supported" );
 static CVAR_DEFINE_AUTO( host_framerate, "0", FCVAR_FILTERABLE, "locks frame timing to this value in seconds" );
 static CVAR_DEFINE( host_sleeptime, "sleeptime", "1", FCVAR_ARCHIVE|FCVAR_FILTERABLE, "milliseconds to sleep for each frame. higher values reduce fps accuracy" );
@@ -659,7 +660,7 @@ void Host_Frame( double time )
 	// and nothing in the log said where the time went, so every stage gets
 	// timed and a frame over the threshold says which one was slow. Gated by
 	// host_profile so a normal run prints nothing.
-	const qboolean profile = Cvar_GetValue( "host_profile" ) != 0.0f;
+	const qboolean profile = host_profile.value != 0.0f;
 	const char *slowest = "none";
 	float worst = 0.0f;
 
@@ -1209,6 +1210,7 @@ int EXPORT Host_Main( int argc, char **argv, const char *progname, int bChangeGa
 	Cvar_RegisterVariable( &host_allow_materials );
 	Cvar_RegisterVariable( &host_serverstate );
 	Cvar_RegisterVariable( &host_maxfps );
+	Cvar_RegisterVariable( &host_profile );
 	Cvar_RegisterVariable( &fps_override );
 	Cvar_RegisterVariable( &host_skipframes );
 	Cvar_RegisterVariable( &host_framerate );
