@@ -3786,7 +3786,14 @@ void Host_ClientFrame( void )
 	}
 	else
 	{
+		double screenStart = Platform_DoubleTime();
 		SCR_UpdateScreen ();
+		if( profile )
+		{
+			float screenMs = (float)(( Platform_DoubleTime() - screenStart ) * 1000.0 );
+			if( screenMs > 50.0f )
+				Con_Printf( S_YELLOW "slow client stage %s: %.1f ms\n" S_DEFAULT, "screen", screenMs );
+		}
 	}
 
 	// update audio
