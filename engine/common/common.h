@@ -349,7 +349,11 @@ typedef struct host_parm_s
 	string default_gamedir;
 } host_parm_t;
 
-extern host_parm_t	host;
+// Exported for the same reason as sv/svs in server.h: the game dlls and the AMXX
+// modules resolve engine globals by symbol name at runtime, and host.realtime is
+// one of them. The attribute belongs on the declaration - MSVC rejects dllexport
+// on the definition when the header already declared the variable.
+extern EXPORT host_parm_t	host;
 
 #define CMD_SERVERDLL   BIT( 0 ) // added by server.dll
 #define CMD_CLIENTDLL   BIT( 1 ) // added by client.dll
