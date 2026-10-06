@@ -3742,39 +3742,61 @@ void Host_ClientFrame( void )
 	if( cls.key_dest == key_game && cls.state == ca_active && !Con_Visible() )
 		Platform_SetTimer( cl_maxframetime.value );
 
+	// Same host_profile switch as Host_Frame(): "slow stage client" alone was
+	// too coarse to explain multi-second stalls, because the resource handshake
+	// and the client dll both live in here.
+	const qboolean profile = host_profile.value != 0.0f;
+	const char *slowest = "none";
+	float worst = 0.0f;
+
+	#define CL_PROFILE_STAGE( name, call ) \
+		do { \
+			double stageStart = Platform_DoubleTime(); \
+			call; \
+			float stageMs = (float)(( Platform_DoubleTime() - stageStart ) * 1000.0); \
+			if( stageMs > worst ) { worst = stageMs; slowest = name; } \
+			if( profile && stageMs > 50.0f ) \
+				Con_Printf( S_YELLOW "slow client stage %s: %.1f ms\n" S_DEFAULT, name, stageMs ); \
+		} while( 0 )
+
 	// if running the server remotely, send intentions now after
 	// the incoming messages have been read
-	if( !SV_Active( )) CL_SendCommand ();
+	CL_PROFILE_STAGE( "send-command", if( !SV_Active( )) CL_SendCommand() );
 
-	clgame.dllFuncs.pfnFrame( host.frametime );
+	CL_PROFILE_STAGE( "cl-frame", clgame.dllFuncs.pfnFrame( host.frametime ) );
 
 	// remember last received framenum
 	CL_SetLastUpdate ();
 
 	// read updates from server
-	CL_ReadPackets ();
+	CL_PROFILE_STAGE( "read-packets", CL_ReadPackets() );
 
 	// do prediction again in case we got
 	// a new portion updates from server
-	CL_RedoPrediction ();
+	CL_PROFILE_STAGE( "prediction", CL_RedoPrediction() );
 
 	// update voice
-	Voice_Idle( host.frametime );
+	CL_PROFILE_STAGE( "voice", Voice_Idle( host.frametime ) );
 
 	// emit visible entities
-	CL_EmitEntities ();
+	CL_PROFILE_STAGE( "emit-entities", CL_EmitEntities() );
 
 	// in case we lost connection
-	CL_CheckForResend ();
+	CL_PROFILE_STAGE( "resend", CL_CheckForResend() );
 
 	// procssing resources on handle
-	while( CL_RequestMissingResources( ));
+	CL_PROFILE_STAGE( "missing-resources", while( CL_RequestMissingResources( )) );
 
 	// handle thirdperson camera
-	CL_MoveThirdpersonCamera();
+	CL_PROFILE_STAGE( "thirdperson", CL_MoveThirdpersonCamera() );
 
 	// handle spectator movement
-	CL_MoveSpectatorCamera();
+	CL_PROFILE_STAGE( "spectator", CL_MoveSpectatorCamera() );
+
+	#undef CL_PROFILE_STAGE
+
+	if( profile && worst > 50.0f )
+		Con_Printf( S_YELLOW "slow client frame: worst stage %s %.1f ms\n" S_DEFAULT, slowest, worst );
 
 	// catch changes video settings
 	VID_CheckChanges();
