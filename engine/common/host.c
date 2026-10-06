@@ -39,7 +39,10 @@ GNU General Public License for more details.
 #include "library.h"
 #include "platform/platform.h"
 
-host_parm_t host;	// host parms
+// Exported for the same reason as sv/svs in server.h: the game dlls and the
+// AMXX modules resolve engine globals by symbol name at runtime, and host.realtime
+// is one of them.
+EXPORT host_parm_t host;	// host parms
 static jmp_buf return_from_main_buf;
 
 /*
