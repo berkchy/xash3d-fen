@@ -378,9 +378,9 @@ typedef struct
 // without them in the dynamic symbol table it reports "sv/svs global variable is
 // not available", disables binding/hooking and later calls a native that was
 // never resolved.
-EXPORT server_static_t svs RENAME_SYMBOL( "svs_" ); // persistant server info
-EXPORT server_t        sv RENAME_SYMBOL( "sv_" );   // local server
-EXPORT svgame_static_t svgame;                      // persistant game info
+extern EXPORT server_static_t svs RENAME_SYMBOL( "svs_" ); // persistant server info
+extern EXPORT server_t        sv RENAME_SYMBOL( "sv_" );   // local server
+extern EXPORT svgame_static_t svgame;                      // persistant game info
 extern areanode_t      sv_areanodes[];              // AABB dynamic tree
 
 extern convar_t		mp_logecho;
