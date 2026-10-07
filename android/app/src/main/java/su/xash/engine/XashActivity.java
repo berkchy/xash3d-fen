@@ -275,46 +275,6 @@ public class XashActivity extends SDLActivity {
                 return mMotdDialog != null;
         }
 
-        /** Decoding is lenient on purpose: the payload is raw UTF-8 bytes and a
-         *  malformed server string must not take the dialog down. */
-        private static String decodeMotdBytes( byte[] b ) {
-                try {
-                        return b == null ? "" : new String( b, "UTF-8" ).trim();
-                } catch ( Throwable t ) {
-                        return "";
-                }
-        }
-
-        /** Destroy the previous MOTD WebView after its dialog is fully detached. */
-        private void scheduleMotdWebViewDestroy() {
-                final WebView wv = mMotdWebView;
-                mMotdWebView = null;
-                if ( wv == null )
-                        return;
-                try {
-                        wv.post( new Runnable() {
-                                @Override
-                                public void run() {
-                                        try {
-                                                wv.stopLoading();
-                                                wv.loadUrl( "about:blank" );
-                                                wv.destroy();
-                                        } catch ( Throwable t ) {
-                                                Log.w( TAG, "MOTD WebView destroy failed", t );
-                                        }
-                                }
-                        } );
-                } catch ( Throwable t ) {
-                        Log.w( TAG, "MOTD WebView destroy failed", t );
-                }
-        }
-
-        // the original HL1 VGUI colors — orange title/button text
-        // (255,170,0) and the window border (178,119,0), straight from
-        // hlsdk-portable cl_dll/vgui_MOTDWindow.cpp
-        private static final int MOTD_VGUI_TEXT = 0xFFFFAA00;
-        private static final int MOTD_VGUI_BORDER = 0xFFB37700;
-
         /** Destroy the previous MOTD WebView after its dialog is fully
          *  detached (WebView.destroy() must never run while the view is still
          *  attached to a window). Posted so it is ordered after dismiss. */
@@ -341,7 +301,7 @@ public class XashActivity extends SDLActivity {
                         } );
         }
 
-        private boolean showMOTDOnUiThread( byte[] titleBytes, byte[] htmlBytes ) {
+        private boolean showMOTDOnUiThread( byte[] htmlBytes ) {
                 try {
                         if ( mMotdDialog != null ) {
                                 mMotdDialog.dismiss();
@@ -352,9 +312,11 @@ public class XashActivity extends SDLActivity {
                         // dialog — reclaim it before building a new one
                         scheduleMotdWebViewDestroy();
 
-                        String title = decodeMotdBytes( titleBytes );
-                        String raw = new String( htmlBytes, "UTF-8" );
-                        Log.i( TAG, "MOTD dialog: title=\"" + title + "\" payloadBytes="
+                        // The engine hands over the payload only; the window title
+                        // is the game directory, like the original HL1 MOTD window.
+                        String title = "MOTD";
+                        String raw = htmlBytes != null ? new String( htmlBytes, "UTF-8" ) : "";
+                        Log.i( TAG, "MOTD dialog: payloadBytes="
                                 + ( htmlBytes != null ? htmlBytes.length : -1 ));
                         String base = Environment.getExternalStorageDirectory().getAbsolutePath() + "/xash";
                         String game = "cstrike";
@@ -537,6 +499,7 @@ public class XashActivity extends SDLActivity {
                         Log.w( TAG, "showMOTD failed", t );
                         return false;
                 }
+        }
 
         private static String buildMOTDDocument( String raw ) {
                 String trimmed = raw == null ? "" : raw.trim();
@@ -584,9 +547,6 @@ public class XashActivity extends SDLActivity {
         private static String escapeMOTDHtml( String s ) {
                 return s.replace( "&", "&amp;" ).replace( "<", "&lt;" ).replace( ">", "&gt;" );
         }
-
-        /** Simplified document for the Html.fromHtml fallback path.
-         *  fromHtml understands basic tags only (no CSS), so block elements
 
         private WebView createMOTDWebView( final File gameDir ) {
                 WebView wv = new WebView( this );
