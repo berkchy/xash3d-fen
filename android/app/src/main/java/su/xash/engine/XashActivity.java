@@ -3,6 +3,7 @@ package su.xash.engine;
 import android.annotation.SuppressLint;
 import android.app.Dialog;
 import android.content.DialogInterface;
+import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -40,7 +41,11 @@ import org.libsdl.app.SDLActivity;
 import su.xash.engine.util.CrashReports;
 import su.xash.engine.util.SoftKeyboardPan;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Locale;
 import java.util.Arrays;
 import java.util.List;
 
