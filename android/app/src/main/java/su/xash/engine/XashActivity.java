@@ -513,6 +513,7 @@ public class XashActivity extends SDLActivity {
                 sld.addState( new int[] { android.R.attr.state_pressed }, pressed );
                 sld.addState( new int[] { -android.R.attr.state_pressed }, normal );
                 return sld;
+        }
 
         private int dp( int v ) {
                 return Math.round( v * getResources().getDisplayMetrics().density );
