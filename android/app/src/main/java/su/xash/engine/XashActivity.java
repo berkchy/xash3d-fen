@@ -6,6 +6,7 @@ import android.content.DialogInterface;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.text.TextUtils;
@@ -470,28 +471,17 @@ public class XashActivity extends SDLActivity {
                         panel.addView( ok, okLp );
 
                         dialog.setContentView( root );
+                        // WebView.destroy() must not run while the view is still
+                        // attached, so the cleanup waits for the dialog to be gone.
                         dialog.setOnDismissListener( new DialogInterface.OnDismissListener() {
                                 @Override
                                 public void onDismiss( DialogInterface d ) {
                                         mMotdDialog = null;
-                                        // reclaim the WebView when the user
-                                        // closes the dialog with OK/back too
                                         scheduleMotdWebViewDestroy();
-                                        notifyMOTDClosed();
                                 }
                         } );
 
                         mMotdDialog = dialog;
-                        dialog.setOnDismissListener( new DialogInterface.OnDismissListener() {
-                                @Override
-                                public void onDismiss( DialogInterface d ) {
-                                        mMotdDialog = null;
-                                        // WebView.destroy() must not run while the
-                                        // view is still attached, so it waits for
-                                        // the dialog to be gone.
-                                        scheduleMotdWebViewDestroy();
-                                }
-                        } );
                         dialog.show();
                         Log.i( TAG, "MOTD dialog shown (WebView HTML rendering)" );
                         return true;
@@ -499,6 +489,38 @@ public class XashActivity extends SDLActivity {
                         Log.w( TAG, "showMOTD failed", t );
                         return false;
                 }
+        }
+
+        }
+
+        /** The reference window — black at ~76% opacity (the game
+         *  faintly shows through, like the PC retail MOTD over the map)
+         *  with Valve's 1px LineBorder (178,119,0). */
+        private Drawable makeMOTDWindowBackground() {
+                GradientDrawable d = new GradientDrawable();
+                d.setColor( 0xC2000000 );
+                d.setStroke( Math.max( 1, dp( 1 )), MOTD_VGUI_BORDER );
+                return d;
+        }
+
+        /** The small command button — near-black body, thin light-gray
+         *  frame (the VGUI CommandButton look), amber when pressed. */
+        private StateListDrawable makeMOTDButtonBackground() {
+                GradientDrawable normal = new GradientDrawable();
+                normal.setColor( 0xE6000000 );
+                normal.setStroke( Math.max( 1, dp( 1 )), 0xFFC8C4BC );
+
+                GradientDrawable pressed = new GradientDrawable();
+                pressed.setColor( 0xFF3A2E10 );
+                pressed.setStroke( Math.max( 1, dp( 1 )), MOTD_VGUI_TEXT );
+
+                StateListDrawable sld = new StateListDrawable();
+                sld.addState( new int[] { android.R.attr.state_pressed }, pressed );
+                sld.addState( new int[] { -android.R.attr.state_pressed }, normal );
+                return sld;
+
+        private int dp( int v ) {
+                return Math.round( v * getResources().getDisplayMetrics().density );
         }
 
         private static String buildMOTDDocument( String raw ) {
