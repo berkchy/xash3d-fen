@@ -86,6 +86,58 @@ qboolean Android_IsMOTDDialogActive( void )
 	return (*jni.env)->CallBooleanMethod( jni.env, jni.activity, jni.isMOTDDialogActive ) ? true : false;
 }
 
+/*
+========================
+Android_GetMOTDAPI
+
+The MOTD entry points handed to client dlls through
+Sys_GetNativeObject("MOTDAPI"). A named lookup instead of a slot in
+cl_enginefunc_t: the client dll copies that struct wholesale, so growing it
+breaks every engine APK that is older than the dll.
+========================
+*/
+android_motdapi_t *Android_GetMOTDAPI( void )
+{
+	static android_motdapi_t motdapi =
+	{
+		sizeof( android_motdapi_t ),
+		CL_ShowMOTD,
+		CL_IsMOTDDialogActive
+	};
+
+	return &motdapi;
+}
+
+/*
+========================
+Android_GetMethodID
+
+GetMethodID leaves a pending NoSuchMethodError behind when the method is
+missing, and every later JNI call then trips ART's assert and aborts the
+process. That happens whenever libxash.so is newer than the activity class it
+runs in. Clear the exception and report the miss instead.
+========================
+*/
+static jmethodID Android_GetMethodID( const char *name, const char *sig )
+{
+	jmethodID id;
+
+	if( !jni.env || !jni.actcls )
+		return NULL;
+
+	id = (*jni.env)->GetMethodID( jni.env, jni.actcls, name, sig );
+
+	if( (*jni.env)->ExceptionCheck( jni.env ) )
+	{
+		(*jni.env)->ExceptionDescribe( jni.env );
+		(*jni.env)->ExceptionClear( jni.env );
+		Con_Printf( S_WARN "activity has no %s%s - that part stays disabled\n", name, sig );
+		return NULL;
+	}
+
+	return id;
+}
+
 void Android_Init( void )
 {
 	memset( &jni, 0, sizeof( jni ));
@@ -93,13 +145,28 @@ void Android_Init( void )
 #if XASH_SDL
 	jni.env = (JNIEnv *)SDL_AndroidGetJNIEnv();
 	jni.activity = (jobject)SDL_AndroidGetActivity();
+
+	if( !jni.env || !jni.activity )
+	{
+		Con_Printf( S_ERROR "no JNI environment, platform calls are unavailable\n" );
+		return;
+	}
+
 	jni.actcls = (*jni.env)->GetObjectClass( jni.env, jni.activity );
-	jni.loadAndroidID = (*jni.env)->GetMethodID( jni.env, jni.actcls, "loadAndroidID", "()Ljava/lang/String;" );
-	jni.getAndroidID = (*jni.env)->GetMethodID( jni.env, jni.actcls, "getAndroidID", "()Ljava/lang/String;" );
-	jni.saveAndroidID = (*jni.env)->GetMethodID( jni.env, jni.actcls, "saveAndroidID", "(Ljava/lang/String;)V" );
+
+	if( !jni.actcls || (*jni.env)->ExceptionCheck( jni.env ) )
+	{
+		(*jni.env)->ExceptionClear( jni.env );
+		Con_Printf( S_ERROR "activity class unavailable, platform calls are disabled\n" );
+		return;
+	}
+
+	jni.loadAndroidID = Android_GetMethodID( "loadAndroidID", "()Ljava/lang/String;" );
+	jni.getAndroidID = Android_GetMethodID( "getAndroidID", "()Ljava/lang/String;" );
+	jni.saveAndroidID = Android_GetMethodID( "saveAndroidID", "(Ljava/lang/String;)V" );
 	// Optional: an activity without them is still fine, MOTD just stays textual.
-	jni.showMOTD = (*jni.env)->GetMethodID( jni.env, jni.actcls, "showMOTD", "([B)Z" );
-	jni.isMOTDDialogActive = (*jni.env)->GetMethodID( jni.env, jni.actcls, "isMOTDDialogActive", "()Z" );
+	jni.showMOTD = Android_GetMethodID( "showMOTD", "([B)Z" );
+	jni.isMOTDDialogActive = Android_GetMethodID( "isMOTDDialogActive", "()Z" );
 #endif // !XASH_SDL
 }
 
@@ -118,6 +185,13 @@ void *Android_GetNativeObject( const char *name )
 	else if( !strcasecmp( name, "ActivityClass" ) )
 	{
 		return (void *)jni.actcls;
+	}
+	else if( !strcasecmp( name, "MOTDAPI" ) )
+	{
+		// Present on every platform: the calls themselves report "no dialog"
+		// when there is none. An engine without this name gives the client dll
+		// NULL and it keeps its text MOTD.
+		return Android_GetMOTDAPI();
 	}
 
 	return NULL;

@@ -1843,12 +1843,12 @@ static int GAME_EXPORT pfnFilteredClientCmd( const char *szCmdString )
 =============
 CL_ShowMOTD / CL_IsMOTDDialogActive
 
-Forward declarations: the cl_enginefunc_t table below is initialized with
-them, and their definitions sit next to the table.
+Declared in client.h: these are reached by client dlls through
+Sys_GetNativeObject("MOTDAPI"), not through cl_enginefunc_t. Nothing may be
+appended to that struct - a dll copies it wholesale, so a dll built against a
+bigger header reads past the end of an older engine's table.
 =============
 */
-static int CL_ShowMOTD( const char *html );
-static int CL_IsMOTDDialogActive( void );
 
 /*
 =============
@@ -3873,9 +3873,7 @@ static cl_enginefunc_t gEngfuncs =
 	pfnGetAppID,
 	Cmd_AliasGetList,
 	pfnVguiWrap2_GetMouseDelta,
-	pfnFilteredClientCmd,
-	CL_ShowMOTD,
-	CL_IsMOTDDialogActive
+	pfnFilteredClientCmd
 };
 
 /*
@@ -3887,7 +3885,7 @@ it in (every desktop platform), which is the client's cue to use its own HUD
 text renderer instead.
 ==================
 */
-static int CL_ShowMOTD( const char *html )
+int CL_ShowMOTD( const char *html )
 {
 	if( !html || !html[0] )
 		return false;
@@ -3906,7 +3904,7 @@ CL_IsMOTDDialogActive
 Whether a platform MOTD dialog is currently on screen.
 ==================
 */
-static int CL_IsMOTDDialogActive( void )
+int CL_IsMOTDDialogActive( void )
 {
 #if XASH_ANDROID
 	return Android_IsMOTDDialogActive() ? true : false;

@@ -86,6 +86,18 @@ void Android_Init( void );
 void *Android_GetNativeObject( const char *name );
 qboolean Android_ShowMOTD( const char *html );          // false when no dialog could be shown
 qboolean Android_IsMOTDDialogActive( void );
+
+// Returned by Sys_GetNativeObject("MOTDAPI"). A client dll looks this up by
+// name and copes with NULL, so adding it costs no engine ABI: an older engine
+// APK simply leaves the client with its text MOTD.
+typedef struct android_motdapi_s
+{
+	size_t		size;                                        // sizeof(this), so a future extension can be detected
+	int		(*pfnShowMOTD)( const char *html );          // true when a dialog is on screen, false when there is none
+	int		(*pfnIsMOTDDialogActive)( void );
+} android_motdapi_t;
+
+android_motdapi_t *Android_GetMOTDAPI( void );
 int Android_GetKeyboardHeight( void );
 void Android_Shutdown( void );
 #endif

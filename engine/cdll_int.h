@@ -307,16 +307,11 @@ typedef struct cl_enginefuncs_s
 	// added in 2019 update, not documented yet
 	int		(*pfnFilteredClientCmd)( const char *cmd );
 
-	// Show an HTML MOTD in a platform dialog (Android: a sandboxed WebView). The
-	// client dll passes the raw payload and gets true back when the dialog is on
-	// screen, false when there is none - so it can fall back to its own HUD text
-	// renderer and the MOTD is never lost. Appending here is ABI safe: client
-	// dlls built against older headers copy a smaller struct and see NULL.
-	int		(*pfnShowMOTD)( const char *html );
-
-	// true while the platform MOTD dialog is up (the CS client defers its team
-	// select menu until this goes false).
-	int		(*pfnIsMOTDDialogActive)( void );
+	// NOTE: do not append to this struct. A client dll copies it wholesale
+	// (gEngfuncs = *pEnginefuncs), so a dll built against a LARGER struct than
+	// the engine that loaded it reads past the end of the engine's table and
+	// calls whatever pointer garbage it found. Growing this struct breaks every
+	// older engine APK. Optional features go through pfnGetNativeObject(name).
 } cl_enginefunc_t;
 
 #define CLDLL_INTERFACE_VERSION	7

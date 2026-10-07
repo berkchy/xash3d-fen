@@ -950,6 +950,11 @@ void CL_ParseTextMessage( sizebuf_t *msg );
 void CL_BatchResourceRequest( qboolean initialize );
 int CL_EstimateNeededResources( void );
 
+// Reached by client dlls via Sys_GetNativeObject("MOTDAPI"). Not part of
+// cl_enginefunc_t - that struct must never grow.
+int CL_ShowMOTD( const char *html );
+int CL_IsMOTDDialogActive( void );
+
 //
 // cl_parse_gs.c
 //
