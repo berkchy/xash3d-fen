@@ -20,11 +20,6 @@ else
 	RELEASE_TAG="continuous-$BRANCH_NAME"
 fi
 
-gh release delete "$RELEASE_TAG" \
-	--yes \
-	--cleanup-tag \
-	--repo "$GITHUB_REPOSITORY" || true
-
 gh run download "$GITHUB_RUN_ID" \
 	--dir artifacts/ \
 	--repo "$GITHUB_REPOSITORY"
@@ -49,6 +44,16 @@ if [ -n "$BASE_BUILDNUM_DATE" ]; then
 fi
 
 sleep 20s
+
+# Only now that the replacement artifacts exist in full is it safe to drop the
+# release we are about to replace. Deleting first - which is what this script
+# used to do - meant a failure anywhere in the download or repackage step took
+# the published release and its tag down with it, leaving nothing to download.
+gh release delete "$RELEASE_TAG" \
+	--yes \
+	--cleanup-tag \
+	--repo "$GITHUB_REPOSITORY" || true
+
 gh release create "$RELEASE_TAG" artifacts/* \
 	--title "$RELEASE_NAME Continuous $BRANCH_NAME Build" \
 	--notes-file release-notes \
