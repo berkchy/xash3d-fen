@@ -352,24 +352,13 @@ public class XashActivity extends SDLActivity {
                         panelLp.gravity = Gravity.CENTER;
                         root.addView( panel, panelLp );
 
-                        // title row like the reference — the CS soldier
-                        // logo left, amber "Title Font" caption, sitting
-                        // directly on the window background (no bar strip;
-                        // the game shows through it), with a thin light
-                        // separator line along its bottom edge.
+                        // The window title: server name in the orange "Title
+                        // Font" colour, sitting directly on the window
+                        // background with a thin separator under it.
                         int titleH = Math.round( panelH * 0.125f );
                         LinearLayout titleBar = new LinearLayout( this );
                         titleBar.setOrientation( LinearLayout.HORIZONTAL );
                         titleBar.setGravity( Gravity.CENTER_VERTICAL );
-
-                        ImageView logo = new ImageView( this );
-                        logo.setImageResource( R.drawable.cs_logo );
-                        logo.setScaleType( ImageView.ScaleType.FIT_CENTER );
-                        int logoSize = Math.round( titleH * 0.62f );
-                        LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(
-                                        logoSize, logoSize );
-                        logoLp.setMargins( Math.round( panelW * 0.035f ), 0, Math.round( panelW * 0.02f ), 0 );
-                        titleBar.addView( logo, logoLp );
 
                         TextView titleView = new TextView( this );
                         titleView.setText(( title != null && !title.isEmpty()) ? title : "Counter-Strike" );
@@ -394,10 +383,9 @@ public class XashActivity extends SDLActivity {
                         // --- content: the sandboxed WebView plays the role of
                         // the original ScrollPanel + TextPanel; HTML MOTDs
                         // render for real, plain text is wrapped game-styled.
-                        // if WebView is unavailable (provider missing,
-                        // device policy, ...) fall back to a styled TextView via
-                        // Html.fromHtml — the dialog still returns true, so the
-                        // client never degrades to raw-text HUD garbage.
+                        // If the WebView cannot be created the whole dialog is
+                        // abandoned and we return false, and the client falls
+                        // back to its own HUD text renderer.
                         View content;
 
                         // the content sits in a PURE BLACK box with no
@@ -408,25 +396,12 @@ public class XashActivity extends SDLActivity {
                         contentWrap.setOrientation( LinearLayout.VERTICAL );
                         contentWrap.setBackgroundColor( 0xFF000000 );
 
-                        try {
-                                WebView wv = createMOTDWebView( gameDir );
+                        WebView wv = createMOTDWebView( gameDir );
+                        wv.setBackgroundColor( 0xFF000000 );
+                        wv.loadDataWithBaseURL( "https://motd.local/", buildMOTDDocument( raw ),
+                                        "text/html", "utf-8", null );
                         mMotdWebView = wv;
-                                wv.setBackgroundColor( 0xFF000000 );
-                                wv.loadDataWithBaseURL( "https://motd.local/", buildMOTDDocument( raw ),
-                                                "text/html", "utf-8", null );
-                                mMotdWebView = wv;
-                                content = wv;
-                        } catch ( Throwable wt ) {
-                                consolePrintf( "MOTD: WebView unavailable (" + wt + "), using styled text" );
-
-                                TextView tv = new TextView( this );
-                                tv.setText( Html.fromHtml( buildMOTDTextHtml( raw ) ) );
-                                tv.setMovementMethod( ScrollingMovementMethod.getInstance() );
-                                tv.setTextColor( 0xFFDEDEDE );
-                                tv.setTextSize( TypedValue.COMPLEX_UNIT_SP, 14 );
-                                tv.setLinkTextColor( MOTD_VGUI_TEXT );
-                                content = tv;
-                        }
+                        content = wv;
 
                         contentWrap.addView(( View ) content, new LinearLayout.LayoutParams(
                                         ViewGroup.LayoutParams.MATCH_PARENT,
