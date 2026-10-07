@@ -58,6 +58,12 @@ public class XashActivity extends SDLActivity {
 	// The MOTD WebView of the currently open dialog. Every map change makes the
 	// server send the MOTD again, and WebViews are expensive, so the old one is
 	// destroyed once its dialog is fully detached.
+	// The original HL1 VGUI MOTD window colours: the orange title/button text
+	// (255,170,0) and the window border (178,119,0), taken from
+	// hlsdk-portable cl_dll/vgui_MOTDWindow.cpp.
+	private static final int MOTD_VGUI_TEXT = 0xFFFFAA00;
+	private static final int MOTD_VGUI_BORDER = 0xFFB37700;
+
 	private Dialog mMotdDialog;
 	private WebView mMotdWebView;
 
@@ -256,7 +262,7 @@ public class XashActivity extends SDLActivity {
                 try {
                         android.os.Looper looper = android.os.Looper.getMainLooper();
                         if ( looper != null && android.os.Looper.myLooper() != looper ) {
-                                looper.post( new Runnable() {
+                                new android.os.Handler( looper ).post( new Runnable() {
                                         @Override
                                         public void run() {
                                                 shown[0] = showMOTDOnUiThread( htmlBytes );
