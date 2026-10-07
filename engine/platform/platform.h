@@ -84,6 +84,8 @@ const char *Android_LoadID( void );
 void Android_SaveID( const char *id );
 void Android_Init( void );
 void *Android_GetNativeObject( const char *name );
+qboolean Android_ShowMOTD( const char *html );          // false when no dialog could be shown
+qboolean Android_IsMOTDDialogActive( void );
 int Android_GetKeyboardHeight( void );
 void Android_Shutdown( void );
 #endif

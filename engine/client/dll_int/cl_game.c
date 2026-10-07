@@ -3862,8 +3862,47 @@ static cl_enginefunc_t gEngfuncs =
 	pfnGetAppID,
 	Cmd_AliasGetList,
 	pfnVguiWrap2_GetMouseDelta,
-	pfnFilteredClientCmd
+	pfnFilteredClientCmd,
+	CL_ShowMOTD,
+	CL_IsMOTDDialogActive
 };
+
+/*
+==================
+CL_ShowMOTD
+
+Hand an HTML MOTD to the platform. Returns false when there is nothing to show
+it in (every desktop platform), which is the client's cue to use its own HUD
+text renderer instead.
+==================
+*/
+static int CL_ShowMOTD( const char *html )
+{
+	if( !html || !html[0] )
+		return false;
+
+#if XASH_ANDROID
+	return Android_ShowMOTD( html ) ? true : false;
+#else
+	return false;
+#endif
+}
+
+/*
+==================
+CL_IsMOTDDialogActive
+
+Whether a platform MOTD dialog is currently on screen.
+==================
+*/
+static int CL_IsMOTDDialogActive( void )
+{
+#if XASH_ANDROID
+	return Android_IsMOTDDialogActive() ? true : false;
+#else
+	return false;
+#endif
+}
 
 void CL_UnloadProgs( void )
 {

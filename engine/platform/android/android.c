@@ -34,7 +34,57 @@ struct jnimethods_s
 	jmethodID loadAndroidID;
 	jmethodID getAndroidID;
 	jmethodID saveAndroidID;
+	jmethodID showMOTD;
+	jmethodID isMOTDDialogActive;
 } jni;
+
+/*
+========================
+Android_ShowMOTD
+
+Render an HTML MOTD in a sandboxed WebView dialog owned by the activity.
+The payload goes over as a raw byte array on purpose: a server string that is
+not valid modified-UTF8 must never abort NewStringUTF, and Java decodes it with
+replacement characters. Returns false when the dialog could not be shown, which
+is the client's cue to fall back to its own text renderer.
+========================
+*/
+qboolean Android_ShowMOTD( const char *html )
+{
+	size_t len;
+	jbyteArray jbytes;
+	jboolean shown;
+
+	if( !jni.env || !jni.activity || !jni.showMOTD )
+		return false;
+
+	len = Q_strlen( html );
+	jbytes = (*jni.env)->NewByteArray( jni.env, (jsize)len );
+
+	if( !jbytes )
+		return false;
+
+	(*jni.env)->SetByteArrayRegion( jni.env, jbytes, 0, (jsize)len, (const jbyte *)html );
+	shown = (*jni.env)->CallBooleanMethod( jni.env, jni.activity, jni.showMOTD, jbytes );
+	(*jni.env)->DeleteLocalRef( jni.env, jbytes );
+
+	return shown ? true : false;
+}
+
+/*
+========================
+Android_IsMOTDDialogActive
+
+Whether a MOTD dialog is on screen right now.
+========================
+*/
+qboolean Android_IsMOTDDialogActive( void )
+{
+	if( !jni.env || !jni.activity || !jni.isMOTDDialogActive )
+		return false;
+
+	return (*jni.env)->CallBooleanMethod( jni.env, jni.activity, jni.isMOTDDialogActive ) ? true : false;
+}
 
 void Android_Init( void )
 {
@@ -47,6 +97,9 @@ void Android_Init( void )
 	jni.loadAndroidID = (*jni.env)->GetMethodID( jni.env, jni.actcls, "loadAndroidID", "()Ljava/lang/String;" );
 	jni.getAndroidID = (*jni.env)->GetMethodID( jni.env, jni.actcls, "getAndroidID", "()Ljava/lang/String;" );
 	jni.saveAndroidID = (*jni.env)->GetMethodID( jni.env, jni.actcls, "saveAndroidID", "(Ljava/lang/String;)V" );
+	// Optional: an activity without them is still fine, MOTD just stays textual.
+	jni.showMOTD = (*jni.env)->GetMethodID( jni.env, jni.actcls, "showMOTD", "([B)Z" );
+	jni.isMOTDDialogActive = (*jni.env)->GetMethodID( jni.env, jni.actcls, "isMOTDDialogActive", "()Z" );
 #endif // !XASH_SDL
 }
 
