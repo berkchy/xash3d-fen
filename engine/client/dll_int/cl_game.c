@@ -1841,6 +1841,17 @@ static int GAME_EXPORT pfnFilteredClientCmd( const char *szCmdString )
 
 /*
 =============
+CL_ShowMOTD / CL_IsMOTDDialogActive
+
+Forward declarations: the cl_enginefunc_t table below is initialized with
+them, and their definitions sit next to the table.
+=============
+*/
+static int CL_ShowMOTD( const char *html );
+static int CL_IsMOTDDialogActive( void );
+
+/*
+=============
 pfnGetPlayerInfo
 
 =============
