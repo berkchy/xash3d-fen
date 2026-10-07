@@ -293,9 +293,6 @@ public class XashActivity extends SDLActivity {
                                         try {
                                                 wv.destroy();
                                         } catch ( Throwable t ) {
-                        Log.w( TAG, "showMOTD failed", t );
-                        return false;
-                }
                                                 Log.w( TAG, "MOTD WebView destroy failed", t );
                                         }
                                 }
@@ -489,8 +486,6 @@ public class XashActivity extends SDLActivity {
                         Log.w( TAG, "showMOTD failed", t );
                         return false;
                 }
-        }
-
         }
 
         /** The reference window — black at ~76% opacity (the game
