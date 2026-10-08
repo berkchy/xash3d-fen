@@ -14,7 +14,13 @@ if [ -z "$RELEASE_NAME" ] || [ -z "$BRANCH_NAME" ]; then
 	exit 1
 fi
 
-if [ "$BRANCH_NAME" == "$DEFAULT_BRANCH_NAME" ]; then
+# RELEASE_TAG_OVERRIDE pins the tag regardless of branch. Without it a build of
+# any non-master branch lands on "continuous-<branch>", so the one release
+# players actually download never gets updated by that branch - and it silently
+# grows a second release next to it on every push.
+if [ -n "$RELEASE_TAG_OVERRIDE" ]; then
+	RELEASE_TAG="$RELEASE_TAG_OVERRIDE"
+elif [ "$BRANCH_NAME" == "$DEFAULT_BRANCH_NAME" ]; then
 	RELEASE_TAG="continuous"
 else
 	RELEASE_TAG="continuous-$BRANCH_NAME"

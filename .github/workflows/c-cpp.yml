@@ -59,4 +59,9 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         BASE_BUILDNUM_DATE: "2015-04-01"
+        # This fork ships from feature/bhop-groundstrafe, not master, and the one
+        # release players download is "continuous". Without pinning the tag every
+        # build would publish to continuous-feature/bhop-groundstrafe and leave
+        # "continuous" frozen on whatever it held when it was last touched.
+        RELEASE_TAG_OVERRIDE: "continuous"
       run: bash scripts/gha/make_release.sh "Xash3D FWGS" "${{ github.ref_name }}"
