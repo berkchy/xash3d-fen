@@ -185,16 +185,20 @@ Con_GetBackgroundColor
 Reads con_bgcolor into r/g/b and reports whether a custom colour was asked for.
 All-zero means "no override": black is the shipped background, so treating it as
 a custom colour would replace the panel for everyone who never touched the cvar.
+
+The exception is alpha: someone who only dialled con_bgalpha down and left the
+colour alone clearly means "let the game show through", so an all-zero colour
+with alpha under 255 is taken at face value.
 ================
 */
-static qboolean Con_GetBackgroundColor( int *r, int *g, int *b )
+static qboolean Con_GetBackgroundColor( int *r, int *g, int *b, int alpha )
 {
 	int cr, cg, cb;
 
 	if( sscanf( con_bgcolor.string, "%i %i %i", &cr, &cg, &cb ) != 3 )
 		return false;
 
-	if( cr == 0 && cg == 0 && cb == 0 )
+	if( cr == 0 && cg == 0 && cb == 0 && alpha >= 255 )
 		return false;
 
 	// Clamped rather than trusted: these come from a cvar string, and a stray
@@ -1949,10 +1953,15 @@ static void Con_DrawSolidConsole( int lines )
 	// con_bgalpha sets how solid it is, which is the interesting half: a
 	// translucent console lets you keep watching the game through it.
 	int bg_r = 0, bg_g = 0, bg_b = 0;
+	int bg_alpha = Q_max( 0, Q_min( 255, (int)con_bgalpha.value ));
 
-	if( Con_GetBackgroundColor( &bg_r, &bg_g, &bg_b ) )
+	if( Con_GetBackgroundColor( &bg_r, &bg_g, &bg_b, bg_alpha ) )
 	{
-		ref.dllFuncs.Color4ub( bg_r, bg_g, bg_b, Q_max( 0, Q_min( 255, (int)con_bgalpha.value ) ) );
+		// kRenderNormal disables GL_BLEND, so the alpha below would be ignored
+		// and the panel would stay opaque whatever con_bgalpha said. TransColor
+		// turns blending on and modulates the alpha into the white texture.
+		ref.dllFuncs.GL_SetRenderMode( bg_alpha < 255 ? kRenderTransColor : kRenderNormal );
+		ref.dllFuncs.Color4ub( bg_r, bg_g, bg_b, bg_alpha );
 
 		// Tall screens leave a strip above the 3:4 panel; it belongs to the
 		// console too, so it takes the same colour.
@@ -1967,6 +1976,12 @@ static void Con_DrawSolidConsole( int lines )
 			ref.dllFuncs.R_DrawStretchPic( 0, lines - refState.height, refState.width, refState.height - refState.width * 3 / 4, 0, 0, 1, 1, R_GetBuiltinTexture( REF_BLACK_TEXTURE ));
 		ref.dllFuncs.R_DrawStretchPic( 0, lines - refState.width * 3 / 4, refState.width, refState.width * 3 / 4, 0, 0, 1, 1, con.background );
 	}
+
+	// Hand blending back before the text: Con_DrawString picks its own render
+	// mode from the font, but the early return below can skip that, and a
+	// frame left with GL_BLEND on tints whatever is drawn after the console.
+	ref.dllFuncs.Color4ub( 255, 255, 255, 255 );
+	ref.dllFuncs.GL_SetRenderMode( kRenderNormal );
 
 	if( !con.curFont || !host.allow_console )
 		return; // nothing to draw
