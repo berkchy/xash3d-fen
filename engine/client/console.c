@@ -197,9 +197,11 @@ static qboolean Con_GetBackgroundColor( int *r, int *g, int *b )
 	if( cr == 0 && cg == 0 && cb == 0 )
 		return false;
 
-	*r = (int)Q_clamp( cr, 0.0f, 255.0f );
-	*g = (int)Q_clamp( cg, 0.0f, 255.0f );
-	*b = (int)Q_clamp( cb, 0.0f, 255.0f );
+	// Clamped rather than trusted: these come from a cvar string, and a stray
+	// value out of range is a corrupted framebuffer, not a warning.
+	*r = Q_max( 0, Q_min( 255, cr ) );
+	*g = Q_max( 0, Q_min( 255, cg ) );
+	*b = Q_max( 0, Q_min( 255, cb ) );
 	return true;
 }
 
@@ -1948,7 +1950,7 @@ static void Con_DrawSolidConsole( int lines )
 
 	if( Con_GetBackgroundColor( &bg_r, &bg_g, &bg_b ) )
 	{
-		ref.dllFuncs.Color4ub( bg_r, bg_g, bg_b, (int)Q_clamp( con_bgalpha.value, 0.0f, 255.0f ) );
+		ref.dllFuncs.Color4ub( bg_r, bg_g, bg_b, Q_max( 0, Q_min( 255, (int)con_bgalpha.value ) ) );
 
 		// Tall screens leave a strip above the 3:4 panel; it belongs to the
 		// console too, so it takes the same colour.
