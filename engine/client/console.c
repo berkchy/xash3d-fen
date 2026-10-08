@@ -818,6 +818,8 @@ void Con_Init( void )
 	Cvar_RegisterVariable( &con_fontrender );
 	Cvar_RegisterVariable( &con_fontnum );
 	Cvar_RegisterVariable( &con_color );
+	Cvar_RegisterVariable( &con_bgcolor );
+	Cvar_RegisterVariable( &con_bgalpha );
 	Cvar_RegisterVariable( &scr_drawversion );
 	Cvar_RegisterVariable( &con_oldfont );
 	Cvar_RegisterVariable( &con_showcompletion );
