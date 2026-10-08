@@ -36,6 +36,7 @@ struct jnimethods_s
 	jmethodID saveAndroidID;
 	jmethodID showMOTD;
 	jmethodID isMOTDDialogActive;
+	jmethodID getKeyboardHeightPerMille;
 } jni;
 
 /*
@@ -172,7 +173,42 @@ void Android_Init( void )
 	// only warns about it, and the HTML MOTD silently stays plain text.
 	jni.showMOTD = Android_GetMethodID( "showMOTD", "([B)Z" );
 	jni.isMOTDDialogActive = Android_GetMethodID( "isMOTDDialogActive", "()Z" );
+	jni.getKeyboardHeightPerMille = Android_GetMethodID( "getKeyboardHeightPerMille", "()I" );
 #endif // !XASH_SDL
+}
+
+/*
+========================
+Android_GetKeyboardHeight
+
+How many pixels at the bottom of the framebuffer the soft keyboard covers, 0
+when it is hidden or when the activity is too old to report it.
+
+The activity answers in per-mille of its own window height rather than in
+pixels: a fullscreen SDL window is never resized for the keyboard, so the
+window tells the engine nothing by itself, and the engine may well render at a
+different height than the window has pixels.
+========================
+*/
+int Android_GetKeyboardHeight( void )
+{
+	int		per_mille;
+
+	if( !jni.env || !jni.activity || !jni.getKeyboardHeightPerMille )
+		return 0;
+
+	per_mille = (*jni.env)->CallIntMethod( jni.env, jni.activity, jni.getKeyboardHeightPerMille );
+
+	if( (*jni.env)->ExceptionCheck( jni.env ) )
+	{
+		(*jni.env)->ExceptionClear( jni.env );
+		return 0;
+	}
+
+	if( per_mille <= 0 || per_mille >= 1000 )
+		return 0;
+
+	return refState.height * per_mille / 1000;
 }
 
 /*

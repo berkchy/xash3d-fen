@@ -32,6 +32,7 @@
     # gets NULL and the HTML MOTD quietly degrades to plain text.
     boolean showMOTD(byte[]);
     boolean isMOTDDialogActive();
+    int getKeyboardHeightPerMille();
 }
 
 -keep,includedescriptorclasses,allowoptimization class org.libsdl.app.SDLInputConnection {

@@ -110,6 +110,56 @@ public class XashActivity extends SDLActivity {
 		return getSharedPreferences("xash_preferences", MODE_PRIVATE).getString("xash_id", "");
 	}
 
+	/** How much of the window the soft keyboard covers at the bottom, in
+	 *  per-mille of the window height. 0 when the keyboard is hidden.
+	 *
+	 *  Looked up by name from the native side (Android_GetKeyboardHeight in
+	 *  engine/platform/android/android.c), so this name must also be listed in
+	 *  proguard-rules.pro - R8 renames whatever is missing from that keep rule
+	 *  and then the lookup silently fails.
+	 *
+	 *  A fullscreen window is never resized for the keyboard (the legendary
+	 *  Android bug SoftKeyboardPan works around), so the engine cannot learn the
+	 *  overlap from the window rect alone; the insets are the only reliable
+	 *  source. The value is a ratio because the engine may render at a different
+	 *  height than the window has pixels.
+	 *
+	 *  @return 0..1000, per-mille of the window height covered by the IME */
+	public int getKeyboardHeightPerMille() {
+		try {
+			android.view.View root = getWindow().getDecorView().getRootView();
+			int full = root.getHeight();
+
+			if (full <= 0)
+				return 0;
+
+			int covered = 0;
+
+			if (android.os.Build.VERSION.SDK_INT >= 30) {
+				android.view.WindowInsets insets = root.getRootWindowInsets();
+
+				if (insets != null)
+					covered = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom;
+			}
+
+			if (covered <= 0) {
+				// Pre-API 30: compare the window against what is actually visible.
+				android.graphics.Rect visible = new android.graphics.Rect();
+				root.getWindowVisibleDisplayFrame(visible);
+				covered = full - (visible.bottom - visible.top);
+			}
+
+			if (covered <= 0 || covered >= full)
+				return 0;
+
+			return (int) (((long) covered * 1000) / full);
+		} catch (Throwable t) {
+			// Never let a layout query take the game down over the console height.
+			Log.w(TAG, "getKeyboardHeightPerMille failed", t);
+			return 0;
+		}
+	}
+
 	@Override
 	public String getCallingPackage() {
 		if (mPackageName != null) {

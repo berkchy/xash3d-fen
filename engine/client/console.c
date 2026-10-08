@@ -22,6 +22,7 @@ GNU General Public License for more details.
 #include "wadfile.h"
 #include "input.h"
 #include "utflib.h"
+#include "platform/platform.h" // Android_GetKeyboardHeight
 
 static CVAR_DEFINE_AUTO( scr_conspeed, "600", FCVAR_ARCHIVE, "console moving speed" );
 static CVAR_DEFINE_AUTO( con_notifytime, "3", FCVAR_ARCHIVE, "notify time to live" );
@@ -1975,6 +1976,39 @@ static void Con_DrawSolidConsole( int lines )
 
 /*
 ==================
+Con_VisibleBottom
+
+The y coordinate the console has to stop at.
+
+The console is anchored to the bottom of the framebuffer and grows upwards,
+which is fine until the soft keyboard covers that bottom - then the input line
+ends up underneath the keyboard and there is no way to see what you type. On
+Android the window is never resized for the keyboard, so the framebuffer height
+is unchanged and the keyboard overlap has to be subtracted here.
+
+Never returns less than a third of the screen: the input line has to stay
+readable no matter how tall the keyboard claims to be.
+==================
+*/
+static int Con_VisibleBottom( void )
+{
+	int	bottom = refState.height;
+
+#if XASH_ANDROID
+	int	keyboard = Android_GetKeyboardHeight();
+
+	if( keyboard > 0 )
+		bottom -= keyboard;
+#endif
+
+	if( bottom < refState.height / 3 )
+		bottom = refState.height / 3;
+
+	return bottom;
+}
+
+/*
+==================
 Con_DrawConsole
 ==================
 */
@@ -1993,7 +2027,7 @@ void Con_DrawConsole( void )
 		{
 			if( cls.key_dest != key_console && Con_BackgroundMapActive( ))
 				con.vislines = con.showlines = 0;
-			else con.vislines = con.showlines = refState.height;
+			else con.vislines = con.showlines = Con_VisibleBottom();
 		}
 		else
 		{
@@ -2010,7 +2044,7 @@ void Con_DrawConsole( void )
 	case ca_disconnected:
 		if( cls.key_dest != key_menu )
 		{
-			Con_DrawSolidConsole( refState.height );
+			Con_DrawSolidConsole( Con_VisibleBottom() );
 			Key_SetKeyDest( key_console );
 		}
 		break;
@@ -2025,7 +2059,7 @@ void Con_DrawConsole( void )
 		if( Con_BackgroundMapActive( ))
 		{
 			if( cls.key_dest == key_console )
-				Con_DrawSolidConsole( refState.height );
+				Con_DrawSolidConsole( Con_VisibleBottom() );
 		}
 		else
 		{
@@ -2102,7 +2136,11 @@ void Con_RunConsole( void )
 	if( host.allow_console && cls.key_dest == key_console )
 	{
 #if XASH_MOBILE_PLATFORM
-		con.showlines = refState.height; // always full screen on mobile devices
+		// Full screen on phones, but never taller than the area the soft
+		// keyboard leaves visible. The input line is drawn at the bottom of the
+		// console, so a full-height console puts what you are typing underneath
+		// the keyboard and you cannot read it.
+		con.showlines = Con_VisibleBottom();
 #else
 		if( cls.state < ca_active || cl.first_frame )
 			con.showlines = refState.height;	// full screen
