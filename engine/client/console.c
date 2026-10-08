@@ -32,6 +32,8 @@ static CVAR_DEFINE_AUTO( con_charset, "cp1251", FCVAR_ARCHIVE, "console font cha
 static CVAR_DEFINE_AUTO( con_fontscale, "1.0", FCVAR_ARCHIVE, "scale font texture" );
 static CVAR_DEFINE_AUTO( con_fontnum, "-1", FCVAR_ARCHIVE, "console font number (0, 1 or 2), -1 for autoselect" );
 static CVAR_DEFINE_AUTO( con_color, "240 180 24", FCVAR_ARCHIVE, "set a custom console color" );
+static CVAR_DEFINE_AUTO( con_bgcolor, "0 0 0", FCVAR_ARCHIVE, "console background color as \"r g b\", all zero keeps the shipped background" );
+static CVAR_DEFINE_AUTO( con_bgalpha, "255", FCVAR_ARCHIVE, "opacity of con_bgcolor, 0-255" );
 static CVAR_DEFINE_AUTO( scr_drawversion, "1", FCVAR_ARCHIVE, "draw version in menu or screenshots, doesn't affect console" );
 static CVAR_DEFINE_AUTO( con_oldfont, "0", 0, "use legacy font from gfx.wad, might be missing or broken" );
 static CVAR_DEFINE_AUTO( con_showcompletion, "1", FCVAR_ARCHIVE, "perform simplified autocompletion while typing" );
@@ -174,6 +176,31 @@ static void Con_Clear_f( void )
 {
 	con.lines_count = 0;
 	con.backscroll = 0; // go to end
+}
+
+/*
+================
+Con_GetBackgroundColor
+
+Reads con_bgcolor into r/g/b and reports whether a custom colour was asked for.
+All-zero means "no override": black is the shipped background, so treating it as
+a custom colour would replace the panel for everyone who never touched the cvar.
+================
+*/
+static qboolean Con_GetBackgroundColor( int *r, int *g, int *b )
+{
+	int cr, cg, cb;
+
+	if( sscanf( con_bgcolor.string, "%i %i %i", &cr, &cg, &cb ) != 3 )
+		return false;
+
+	if( cr == 0 && cg == 0 && cb == 0 )
+		return false;
+
+	*r = (int)Q_clamp( cr, 0.0f, 255.0f );
+	*g = (int)Q_clamp( cg, 0.0f, 255.0f );
+	*b = (int)Q_clamp( cb, 0.0f, 255.0f );
+	return true;
 }
 
 /*
@@ -1912,10 +1939,30 @@ static void Con_DrawSolidConsole( int lines )
 
 	// draw the background
 	ref.dllFuncs.GL_SetRenderMode( kRenderNormal );
-	ref.dllFuncs.Color4ub( 255, 255, 255, 255 ); // to prevent grab color from screenfade
-	if( refState.width * 3 / 4 < refState.height && lines >= refState.height )
-		ref.dllFuncs.R_DrawStretchPic( 0, lines - refState.height, refState.width, refState.height - refState.width * 3 / 4, 0, 0, 1, 1, R_GetBuiltinTexture( REF_BLACK_TEXTURE ));
-	ref.dllFuncs.R_DrawStretchPic( 0, lines - refState.width * 3 / 4, refState.width, refState.width * 3 / 4, 0, 0, 1, 1, con.background );
+
+	// con_bgcolor recolours the panel; "0 0 0" means "no override", so the
+	// shipped background stays put for anyone who never touched the cvar.
+	// con_bgalpha sets how solid it is, which is the interesting half: a
+	// translucent console lets you keep watching the game through it.
+	int bg_r = 0, bg_g = 0, bg_b = 0;
+
+	if( Con_GetBackgroundColor( &bg_r, &bg_g, &bg_b ) )
+	{
+		ref.dllFuncs.Color4ub( bg_r, bg_g, bg_b, (int)Q_clamp( con_bgalpha.value, 0.0f, 255.0f ) );
+
+		// Tall screens leave a strip above the 3:4 panel; it belongs to the
+		// console too, so it takes the same colour.
+		if( refState.width * 3 / 4 < refState.height && lines >= refState.height )
+			ref.dllFuncs.R_DrawStretchPic( 0, lines - refState.height, refState.width, refState.height - refState.width * 3 / 4, 0, 0, 1, 1, R_GetBuiltinTexture( REF_WHITE_TEXTURE ) );
+		ref.dllFuncs.R_DrawStretchPic( 0, lines - refState.width * 3 / 4, refState.width, refState.width * 3 / 4, 0, 0, 1, 1, R_GetBuiltinTexture( REF_WHITE_TEXTURE ) );
+	}
+	else
+	{
+		ref.dllFuncs.Color4ub( 255, 255, 255, 255 ); // to prevent grab color from screenfade
+		if( refState.width * 3 / 4 < refState.height && lines >= refState.height )
+			ref.dllFuncs.R_DrawStretchPic( 0, lines - refState.height, refState.width, refState.height - refState.width * 3 / 4, 0, 0, 1, 1, R_GetBuiltinTexture( REF_BLACK_TEXTURE ));
+		ref.dllFuncs.R_DrawStretchPic( 0, lines - refState.width * 3 / 4, refState.width, refState.width * 3 / 4, 0, 0, 1, 1, con.background );
+	}
 
 	if( !con.curFont || !host.allow_console )
 		return; // nothing to draw
