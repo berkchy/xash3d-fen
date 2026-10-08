@@ -165,6 +165,11 @@ void Android_Init( void )
 	jni.getAndroidID = Android_GetMethodID( "getAndroidID", "()Ljava/lang/String;" );
 	jni.saveAndroidID = Android_GetMethodID( "saveAndroidID", "(Ljava/lang/String;)V" );
 	// Optional: an activity without them is still fine, MOTD just stays textual.
+	//
+	// These names must also be listed in android/app/proguard-rules.pro. R8
+	// renames any member missing from that keep rule, and a renamed method is
+	// invisible to GetMethodID - the lookup then returns NULL, Android_Init
+	// only warns about it, and the HTML MOTD silently stays plain text.
 	jni.showMOTD = Android_GetMethodID( "showMOTD", "([B)Z" );
 	jni.isMOTDDialogActive = Android_GetMethodID( "isMOTDDialogActive", "()Z" );
 #endif // !XASH_SDL

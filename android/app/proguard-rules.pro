@@ -27,6 +27,11 @@
     java.lang.String getCallingPackage();
     java.lang.String[] getAssetsList(boolean, java.lang.String);
     android.content.res.AssetManager getAssets(boolean);
+    # Looked up by name from native code (GetMethodID in engine/platform/android).
+    # R8 renames anything not listed here, and then the native side silently
+    # gets NULL and the HTML MOTD quietly degrades to plain text.
+    boolean showMOTD(byte[]);
+    boolean isMOTDDialogActive();
 }
 
 -keep,includedescriptorclasses,allowoptimization class org.libsdl.app.SDLInputConnection {
