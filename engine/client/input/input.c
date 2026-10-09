@@ -793,27 +793,34 @@ Called from cl_main.c after generating command in client
 */
 void IN_EngineAppendMove( float frametime, usercmd_t *cmd, qboolean active )
 {
-	if( clgame.dllFuncs.pfnLookEvent )
-		return;
-
 	if( cls.key_dest != key_game || cl.paused || cl.intermission )
 		return;
 
 	if( active )
 	{
-		float forward = 0, side = 0, pitch = 0, yaw = 0;
-		float sensitivity = 1;//( (float)cl.local.scr_fov / (float)90.0f );
-
-		IN_CollectInput( &forward, &side, &pitch, &yaw, false );
-
-		IN_JoyAppendMove( cmd, forward, side );
-
-		if( pitch || yaw )
+		// A client that exports LookEvent owns the view angles and the move
+		// axes: IN_Commands already handed it this frame's input, and its own
+		// CL_CreateMove has already run by the time we get here, so adding ours
+		// would apply all of it twice. The assists below read none of that -
+		// they only toggle duck and jump on the command and trace the world -
+		// so they are not skipped with it. They used to be, which is why +gs
+		// and the bunny hop did nothing on any client built that way.
+		if( !clgame.dllFuncs.pfnLookEvent )
 		{
-			cmd->viewangles[YAW]   += yaw * sensitivity;
-			cmd->viewangles[PITCH] += pitch * sensitivity;
-			cmd->viewangles[PITCH] = bound( -90, cmd->viewangles[PITCH], 90 );
-			VectorCopy( cmd->viewangles, cl.viewangles );
+			float forward = 0, side = 0, pitch = 0, yaw = 0;
+			float sensitivity = 1;//( (float)cl.local.scr_fov / (float)90.0f );
+
+			IN_CollectInput( &forward, &side, &pitch, &yaw, false );
+
+			IN_JoyAppendMove( cmd, forward, side );
+
+			if( pitch || yaw )
+			{
+				cmd->viewangles[YAW]   += yaw * sensitivity;
+				cmd->viewangles[PITCH] += pitch * sensitivity;
+				cmd->viewangles[PITCH] = bound( -90, cmd->viewangles[PITCH], 90 );
+				VectorCopy( cmd->viewangles, cl.viewangles );
+			}
 		}
 
 		// one trace per move, shared by both assists. The duck state comes
