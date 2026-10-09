@@ -610,20 +610,25 @@ IN_GroundDistance
 How far the floor is below the local player's feet, traced straight down.
 Returns -1 when no floor was found within MAX_GROUND_DIST.
 
-GoldSrc keeps the origin in the middle of the standing hull, so the feet are
-36 units below it (18 when ducked). The trace starts a unit above the feet so
-the result reads 0 exactly on the floor, which is what IN_IsOnGround and the
-bhop release height key off.
+The trace is a ray (hull 0), not the box CL_TraceLine() uses. The box is 32
+units wide and axis aligned, so on a slope its corners meet the surface before
+its centre does: the trace either stops short of the feet or reports the start
+already solid, and IN_GroundDistance answered -1. -1 means "no floor", so
+IN_IsOnGround said airborne and +gs never fired on anything but flat ground. A
+ray only ever has to meet the floor directly underneath, which is what standing
+on a slope actually is.
 
-This is what the movement assists key off, rather than cl.local.onground.
-cl.local.onground is written by the prediction pass, which runs *after* this
-hook, so at high tickrates there are frames with nothing to predict and it
-reads back as -1 (airborne) even while standing still on the floor.
+The foot offset comes from the hull the game reported rather than a hardcoded
+36/18. Which way round a hull hangs is the game's choice, and reading it here
+means this keeps working for a game that uses a different one. The trace starts
+a unit above the feet so the result reads 0 exactly on the floor, which is what
+IN_IsOnGround and the bhop release height key off.
 
-CL_TraceLine() is the engine's own simple trace (see CL_SetIdealPitch) and is
-what we want here: it uses hull 2 like the original client code did, converts
-to trace space itself, and PM_STUDIO_IGNORE keeps the local player from being
-reported as its own floor.
+This is the primary measure rather than cl.local.onground. That is written by
+the prediction pass, which runs *after* this hook, so at high tickrates there
+are frames with nothing to predict and it reads back as -1 (airborne) even
+while standing still. It is consulted as a second opinion below, never on its
+own: a predicted "on the ground" with no floor in reach is ignored.
 ================
 */
 #define MAX_GROUND_DIST 64.0f
@@ -632,26 +637,45 @@ static float IN_GroundDistance( qboolean ducking )
 {
 	vec3_t start, end;
 
-	const float bottom = ducking ? 18.0f : 36.0f;
+	// Origin sits this far above the feet; negative when the hull hangs the
+	// other way, in which case the feet are above the origin and there is
+	// nothing below it to find.
+	const int hull = ducking ? 3 : 2;
+	float bottom = 0.0f;
+
+	if( hull >= 0 && hull < MAX_MAP_HULLS )
+		bottom = -host.player_mins[hull][2];
+
+	if( bottom <= 0.0f || bottom >= MAX_GROUND_DIST )
+		return -1.0f;
 
 	VectorCopy( cl.simorg, start );
 	start[2] -= bottom - 1.0f;
 	VectorCopy( start, end );
 	end[2] -= MAX_GROUND_DIST;
 
-	const pmtrace_t tr = CL_TraceLine( start, end, PM_STUDIO_IGNORE );
+	// -1 for ignore_pe matches CL_TraceLine(); PM_STUDIO_IGNORE is what keeps
+	// the local player from being reported as its own floor.
+	const pmtrace_t *tr = clgame.pmove->PM_TraceLine( start, end, PM_STUDIO_IGNORE, 0, -1 );
 
-	if( tr.fraction >= 1.0f || tr.allsolid || tr.startsolid )
+	if( !tr || tr->fraction >= 1.0f || tr->allsolid || tr->startsolid )
 		return -1.0f;
 
 	// distance from the feet to the floor
-	return tr.fraction * MAX_GROUND_DIST - 1.0f;
+	return tr->fraction * MAX_GROUND_DIST - 1.0f;
 }
 
 // close enough to the floor that the next step down would put us on it
 static qboolean IN_IsOnGround( float ground_dist )
 {
-	return ground_dist >= 0.0f && ground_dist <= 1.0f;
+	if( ground_dist >= 0.0f && ground_dist <= 1.0f )
+		return true;
+
+	// A slope can leave the feet a little clear of the surface for a frame
+	// while the trace says airborne, and the predicted flag already has them
+	// down. It only ever breaks the tie, never invents ground the trace did
+	// not see.
+	return ground_dist < 0.0f && cl.local.onground != -1 && cl.local.waterlevel < 2;
 }
 
 /*
