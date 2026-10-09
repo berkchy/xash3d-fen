@@ -603,6 +603,11 @@ static void IN_CollectInput( float *forward, float *side, float *pitch, float *y
 
 }
 
+// How far below the feet a trace may reach before the floor counts as absent.
+// Defined up here because IN_FootOffset, which runs before IN_GroundDistance,
+// range checks against it.
+#define MAX_GROUND_DIST 64.0f
+
 /*
 ================
 IN_FootOffset
@@ -683,7 +688,6 @@ while standing still. It is consulted as a second opinion below, never on its
 own: a predicted "on the ground" with no floor in reach is ignored.
 ===============
 */
-#define MAX_GROUND_DIST 64.0f
 
 static float IN_GroundDistance( qboolean ducking )
 {
