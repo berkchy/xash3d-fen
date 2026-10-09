@@ -605,6 +605,59 @@ static void IN_CollectInput( float *forward, float *side, float *pitch, float *y
 
 /*
 ================
+IN_FootOffset
+
+How far the local player's feet are below the origin, in the hull they are
+currently using.
+
+Picked by measuring rather than by index, because the hull numbering here is
+not GoldSrc's. This engine fills hull 0 with the standing box and hull 1 with
+the ducking one and leaves 2 and 3 zeroed, so the old hardcoded 2/3 read a
+zero vector, bottom came out 0, and IN_GroundDistance bailed out with -1 on
+every frame - which is "no floor", so neither assist ever ran. The engine log
+shows it plainly:
+
+  CL: hull0, player_mins: -16 -16 -36
+  CL: hull1, player_mins: -16 -16 -18
+  CL: hull2, player_mins: 0 0 0
+
+The standing hull is the tallest one the game described and the ducking hull
+the shallowest, so measure both rather than trusting a constant. Returns <= 0
+when the game has described nothing usable.
+*/
+static float IN_FootOffset( qboolean ducking )
+{
+	float best = 0.0f;
+	int hull;
+
+	for( hull = 0; hull < MAX_MAP_HULLS; hull++ )
+	{
+		const float bottom = -host.player_mins[hull][2];
+		const float top = host.player_maxs[hull][2];
+
+		// Skip hulls the game never filled in, and anything that is not
+		// shaped like a player box.
+		if( bottom <= 1.0f || bottom >= MAX_GROUND_DIST )
+			continue;
+		if( top <= 0.0f || host.player_maxs[hull][0] <= 0.0f )
+			continue;
+
+		if( ducking )
+		{
+			if( best <= 0.0f || bottom < best )
+				best = bottom;
+		}
+		else if( bottom > best )
+		{
+			best = bottom;
+		}
+	}
+
+	return best;
+}
+
+/*
+=============
 IN_GroundDistance
 
 How far the floor is below the local player's feet, traced straight down.
@@ -619,17 +672,16 @@ ray only ever has to meet the floor directly underneath, which is what standing
 on a slope actually is.
 
 The foot offset comes from the hull the game reported rather than a hardcoded
-36/18. Which way round a hull hangs is the game's choice, and reading it here
-means this keeps working for a game that uses a different one. The trace starts
-a unit above the feet so the result reads 0 exactly on the floor, which is what
-IN_IsOnGround and the bhop release height key off.
+36/18 - see IN_FootOffset for why the index GoldSrc uses does not exist here.
+The trace starts a unit above the feet so the result reads 0 exactly on the
+floor, which is what IN_IsOnGround and the bhop release height key off.
 
 This is the primary measure rather than cl.local.onground. That is written by
 the prediction pass, which runs *after* this hook, so at high tickrates there
 are frames with nothing to predict and it reads back as -1 (airborne) even
 while standing still. It is consulted as a second opinion below, never on its
 own: a predicted "on the ground" with no floor in reach is ignored.
-================
+===============
 */
 #define MAX_GROUND_DIST 64.0f
 
@@ -637,14 +689,7 @@ static float IN_GroundDistance( qboolean ducking )
 {
 	vec3_t start, end;
 
-	// Origin sits this far above the feet; negative when the hull hangs the
-	// other way, in which case the feet are above the origin and there is
-	// nothing below it to find.
-	const int hull = ducking ? 3 : 2;
-	float bottom = 0.0f;
-
-	if( hull >= 0 && hull < MAX_MAP_HULLS )
-		bottom = -host.player_mins[hull][2];
+	const float bottom = IN_FootOffset( ducking );
 
 	if( bottom <= 0.0f || bottom >= MAX_GROUND_DIST )
 		return -1.0f;
