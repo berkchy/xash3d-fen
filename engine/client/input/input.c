@@ -609,6 +609,21 @@ static void IN_CollectInput( float *forward, float *side, float *pitch, float *y
 #define MAX_GROUND_DIST 64.0f
 
 /*
+Failure sentinels. All of them mean "no usable floor" to the assists, so the
+call sites only ever compare against 0; they exist so bhop_debug can say which
+step failed instead of printing -1 for four different problems.
+
+  -1  the game described no usable hull
+  -2  no pmove, or the trace returned nothing
+  -3  the ray reached its full length without hitting anything
+  -4  the start point was already inside something
+*/
+#define GROUND_NO_HULL   (-1.0f)
+#define GROUND_NO_TRACE  (-2.0f)
+#define GROUND_NO_HIT    (-3.0f)
+#define GROUND_STARTSOLID (-4.0f)
+
+/*
 ================
 IN_FootOffset
 
@@ -686,6 +701,11 @@ the prediction pass, which runs *after* this hook, so at high tickrates there
 are frames with nothing to predict and it reads back as -1 (airborne) even
 while standing still. It is consulted as a second opinion below, never on its
 own: a predicted "on the ground" with no floor in reach is ignored.
+
+bhop_debug prints the raw value, so a failure reads as -1 for no usable hull,
+-2 for no pmove, -3 for a trace that hit nothing within MAX_GROUND_DIST and -4
+for a start point already inside geometry. They all mean the same thing to the
+assists, which only ever compare against zero.
 ===============
 */
 
@@ -696,7 +716,10 @@ static float IN_GroundDistance( qboolean ducking )
 	const float bottom = IN_FootOffset( ducking );
 
 	if( bottom <= 0.0f || bottom >= MAX_GROUND_DIST )
-		return -1.0f;
+		return GROUND_NO_HULL;
+
+	if( !clgame.pmove )
+		return GROUND_NO_TRACE;
 
 	VectorCopy( cl.simorg, start );
 	start[2] -= bottom - 1.0f;
@@ -707,8 +730,12 @@ static float IN_GroundDistance( qboolean ducking )
 	// the local player from being reported as its own floor.
 	const pmtrace_t *tr = clgame.pmove->PM_TraceLine( start, end, PM_STUDIO_IGNORE, 0, -1 );
 
-	if( !tr || tr->fraction >= 1.0f || tr->allsolid || tr->startsolid )
-		return -1.0f;
+	if( !tr )
+		return GROUND_NO_TRACE;
+	if( tr->startsolid || tr->allsolid )
+		return GROUND_STARTSOLID;
+	if( tr->fraction >= 1.0f )
+		return GROUND_NO_HIT;
 
 	// distance from the feet to the floor
 	return tr->fraction * MAX_GROUND_DIST - 1.0f;
@@ -914,8 +941,10 @@ void IN_EngineAppendMove( float frametime, usercmd_t *cmd, qboolean active )
 				if( host.realtime >= next_report )
 				{
 					next_report = host.realtime + 1.0;
-					Con_Printf( "bhop: dist=%.1f ground=%d pred_onground=%d jump=%d duck=%d gs=%d armed=%d\n",
-						ground_dist, IN_IsOnGround( ground_dist ), cl.local.onground != -1,
+					Con_Printf( "bhop: dist=%.1f foot=%.1f hull0=%.0f hull1=%.0f ground=%d pred_onground=%d jump=%d duck=%d gs=%d armed=%d\n",
+						ground_dist, IN_FootOffset( cmd->buttons & IN_DUCK ),
+						-host.player_mins[0][2], -host.player_mins[1][2],
+						IN_IsOnGround( ground_dist ), cl.local.onground != -1,
 						!!(cmd->buttons & IN_JUMP), !!(cmd->buttons & IN_DUCK),
 						gs_state.enabled, gs_state.armed );
 				}
