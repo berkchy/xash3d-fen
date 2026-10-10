@@ -2177,6 +2177,7 @@ static void CL_ParseGoldSrcStatusMessage( netadr_t from, sizebuf_t *msg, qboolea
 	Info_SetValueForKey( s, "coop", "0", sizeof( s ));
 	Info_SetValueForKeyf( s, "numcl", sizeof( s ), "%i", numcl );
 	Info_SetValueForKeyf( s, "maxcl", sizeof( s ), "%i", maxcl );
+	Info_SetValueForKeyf( s, "bots", sizeof( s ), "%i", bots ); // parsed above, dropped otherwise
 	Info_SetValueForKey( s, "gamedir", gamedir, sizeof( s ));
 	Info_SetValueForKey( s, "password", password ? "1" : "0", sizeof( s ));
 
