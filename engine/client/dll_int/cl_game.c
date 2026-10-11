@@ -1030,7 +1030,13 @@ void CL_DrawHUD( int state )
 		CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
 		break;
 	case CL_CHANGELEVEL:
-		if( cls.draw_changelevel )
+		// draw_changelevel only marks the first frame, so taking it as the
+		// whole condition showed the panel for a single frame and nothing for
+		// the rest of the load. video_prepped goes false in
+		// SCR_BeginLoadingPlaque and true again once the signon is parsed,
+		// which is the whole duration of the load. Background loading keeps
+		// its own flag, since that one must not take over the screen.
+		if( cls.draw_changelevel || (!cl.video_prepped && !cl.background) )
 		{
 			CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
 			cls.draw_changelevel = false;

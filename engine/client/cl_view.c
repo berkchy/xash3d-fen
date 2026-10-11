@@ -557,11 +557,14 @@ void V_PostRender( void )
 		IN_GyroDrawDebug();
 		SV_DrawOrthoTriangles();
 		CL_DrawDemoRecording();
-		CL_DrawHUD( CL_CHANGELEVEL );
 		ref.dllFuncs.R_ShowTextures();
 		R_ShowTree();
 		Con_DrawConsole();
 		UI_UpdateMenu( host.realtime );
+		// the loading panel goes on top of both: the console and the menu are
+		// up for the whole of a level load, and either one drawn afterwards
+		// covers the panel completely
+		CL_DrawHUD( CL_CHANGELEVEL );
 		Con_DrawVersion();
 		Con_DrawDebug(); // must be last
 		Touch_Draw();

@@ -721,15 +721,9 @@ static float IN_GroundDistance( qboolean ducking )
 	if( !clgame.pmove )
 		return GROUND_NO_TRACE;
 
-	// How far above the feet the trace starts. A unit is not enough: after a
-	// landing cl.simorg routinely sits a couple of units inside the floor, so
-	// a start one unit above the feet is still inside the brush and every
-	// frame came back startsolid (-4). That reads as "no floor", and both
-	// assists give up on a negative distance, which is why the bunny hop did
-	// nothing: bhop_debug showed dist=-4.0 on 805 of the 823 samples.
-	// Starting well above the feet cannot start inside the floor in any
-	// normal case, and the result is still measured from the feet.
-	const float start_above = 8.0f;
+	// How far above the feet the trace starts, so a frame where the predicted
+	// origin is a unit or two into the floor still traces open air.
+	const float start_above = 4.0f;
 	const float length = MAX_GROUND_DIST + start_above;
 
 	VectorCopy( cl.simorg, start );
@@ -737,9 +731,15 @@ static float IN_GroundDistance( qboolean ducking )
 	VectorCopy( start, end );
 	end[2] -= length;
 
+	// usehull 2 is the ray: PM_HullForBsp maps 2 to hulls[0], the point hull.
+	// Passing 0 looks like it should be the same thing and is not - 0 falls
+	// through to the default case and returns hulls[1], the standing player
+	// box. That box hangs 36 units below the trace point, so every frame came
+	// back startsolid (-4) no matter where the trace started, which reads as
+	// "no floor" and stops the bunny hop before it does anything.
 	// -1 for ignore_pe matches CL_TraceLine(); PM_STUDIO_IGNORE is what keeps
 	// the local player from being reported as its own floor.
-	const pmtrace_t *tr = clgame.pmove->PM_TraceLine( start, end, PM_STUDIO_IGNORE, 0, -1 );
+	const pmtrace_t *tr = clgame.pmove->PM_TraceLine( start, end, PM_STUDIO_IGNORE, 2, -1 );
 
 	if( !tr )
 		return GROUND_NO_TRACE;
