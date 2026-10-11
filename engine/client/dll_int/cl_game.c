@@ -863,15 +863,126 @@ static void CL_DrawCrosshair( void )
 
 /*
 =============
+CL_FillRectHUD
+
+a filled rectangle given in 640x480 space, blended rather than added: the
+panel has to read as a panel over whatever the renderer left on screen
+=============
+*/
+static void CL_FillRectHUD( int x, int y, int w, int h, byte r, byte g, byte b, byte a )
+{
+	float x_ = x, y_ = y, w_ = w, h_ = h;
+
+	if( w_ <= 0.0f || h_ <= 0.0f )
+		return;
+
+	SPR_AdjustSize( &x_, &y_, &w_, &h_ );
+	ref.dllFuncs.FillRGBA( kRenderTransTexture, x_, y_, w_, h_, r, g, b, a );
+}
+
+/*
+=============
+CL_DrawLoadingPanel
+
+The bar texture is optional: SCR_RegisterTextures looks for gfx/loading.bmp
+and gfx/lambda.lmp and quietly keeps zero when neither is in the game files.
+Stretching texture zero leaves the screen blank for the whole level load, so
+draw the panel instead: a label, the bar, and the file being fetched.
+
+scr_download carries a real percentage while a download runs. scr_loading is
+only ever reset to zero and never incremented, so plain loading has no
+honest percentage to show and gets a moving block instead.
+=============
+*/
+static void CL_DrawLoadingPanel( const char *label )
+{
+	const int bar_width = 320;
+	const int bar_height = 16;
+	const int screen_width = clgame.scrInfo.iWidth;
+	const int x = ( screen_width - bar_width ) / 2;
+	const int y = clgame.scrInfo.iHeight / 2 + 8;
+
+	const qboolean downloading = scr_download.value >= 0.0f;
+	const float percent = downloading ? bound( 0.0f, scr_download.value, 100.0f ) : 0.0f;
+
+	cl_font_t *font = Con_GetFont( con_fontsize.value );
+	const int line = font ? font->charHeight : 16;
+	char info[256];
+
+	if( downloading && host.downloadfile[0] )
+		Q_snprintf( info, sizeof( info ), "%s", host.downloadfile );
+	else if( downloading )
+		Q_snprintf( info, sizeof( info ), "%i%%", (int)( percent + 0.5f ) );
+	else
+		info[0] = '\0';
+
+	if( font )
+	{
+		rgba_t color;
+		int width = 0;
+
+		Vector4Set( color, 255, 255, 255, 255 );
+		CL_DrawStringLen( font, label, &width, NULL, FONT_DRAW_HUD );
+		CL_DrawString( CL_AdjustXPos( -1, width, width ), y - line - 6,
+			label, color, font, FONT_DRAW_HUD | FONT_DRAW_UTF8 );
+
+		if( info[0] )
+		{
+			Vector4Set( color, 180, 180, 180, 255 );
+			width = 0;
+			CL_DrawStringLen( font, info, &width, NULL, FONT_DRAW_HUD );
+			CL_DrawString( CL_AdjustXPos( -1, width, width ), y + bar_height + 6,
+				info, color, font, FONT_DRAW_HUD | FONT_DRAW_UTF8 );
+		}
+	}
+
+	int filled;
+
+	if( downloading )
+	{
+		filled = (int)( bar_width * ( percent / 100.0f ) );
+	}
+	else
+	{
+		// no progress is tracked, so sweep a block and let it wrap
+		const int block = bar_width / 6;
+		const float period = 1.8f;
+		const float phase = (float)( fmod( host.realtime, period ) / period );
+
+		filled = (int)( phase * ( bar_width + block ) ) - block;
+	}
+
+	filled = bound( 0, filled, bar_width );
+
+	CL_FillRectHUD( x, y, bar_width, bar_height, 16, 16, 20, 200 );
+
+	if( filled > 0 )
+		CL_FillRectHUD( x, y, filled, bar_height, 240, 180, 24, 255 );
+
+	CL_FillRectHUD( x, y, bar_width, 1, 240, 180, 24, 255 );
+	CL_FillRectHUD( x, y + bar_height - 1, bar_width, 1, 240, 180, 24, 255 );
+	CL_FillRectHUD( x, y, 1, bar_height, 240, 180, 24, 255 );
+	CL_FillRectHUD( x + bar_width - 1, y, 1, bar_height, 240, 180, 24, 255 );
+}
+
+/*
+=============
 CL_DrawLoading
 
 draw loading progress bar
 =============
 */
-static void CL_DrawLoadingOrPaused( int tex )
+static void CL_DrawLoadingOrPaused( int tex, const char *label )
 {
 	float	x, y, width, height;
 	int iWidth, iHeight;
+
+	// nothing to stretch, and stretching zero draws nothing at all
+	if( tex <= 0 )
+	{
+		CL_DrawLoadingPanel( label );
+		return;
+	}
 
 	R_GetTextureParms( &iWidth, &iHeight, tex );
 	x = ( clgame.scrInfo.iWidth - iWidth ) / 2.0f;
@@ -912,16 +1023,16 @@ void CL_DrawHUD( int state )
 		{
 			if( !cls.pauseIcon )
 				cls.pauseIcon = SCR_LoadPauseIcon();
-			CL_DrawLoadingOrPaused( Q_max( 0, cls.pauseIcon ));
+			CL_DrawLoadingOrPaused( Q_max( 0, cls.pauseIcon ), "Paused" );
 		}
 		break;
 	case CL_LOADING:
-		CL_DrawLoadingOrPaused( cls.loadingBar );
+		CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
 		break;
 	case CL_CHANGELEVEL:
 		if( cls.draw_changelevel )
 		{
-			CL_DrawLoadingOrPaused( cls.loadingBar );
+			CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
 			cls.draw_changelevel = false;
 		}
 		break;
