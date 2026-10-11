@@ -721,10 +721,21 @@ static float IN_GroundDistance( qboolean ducking )
 	if( !clgame.pmove )
 		return GROUND_NO_TRACE;
 
+	// How far above the feet the trace starts. A unit is not enough: after a
+	// landing cl.simorg routinely sits a couple of units inside the floor, so
+	// a start one unit above the feet is still inside the brush and every
+	// frame came back startsolid (-4). That reads as "no floor", and both
+	// assists give up on a negative distance, which is why the bunny hop did
+	// nothing: bhop_debug showed dist=-4.0 on 805 of the 823 samples.
+	// Starting well above the feet cannot start inside the floor in any
+	// normal case, and the result is still measured from the feet.
+	const float start_above = 8.0f;
+	const float length = MAX_GROUND_DIST + start_above;
+
 	VectorCopy( cl.simorg, start );
-	start[2] -= bottom - 1.0f;
+	start[2] -= bottom - start_above;
 	VectorCopy( start, end );
-	end[2] -= MAX_GROUND_DIST;
+	end[2] -= length;
 
 	// -1 for ignore_pe matches CL_TraceLine(); PM_STUDIO_IGNORE is what keeps
 	// the local player from being reported as its own floor.
@@ -738,7 +749,7 @@ static float IN_GroundDistance( qboolean ducking )
 		return GROUND_NO_HIT;
 
 	// distance from the feet to the floor
-	return tr->fraction * MAX_GROUND_DIST - 1.0f;
+	return tr->fraction * length - start_above;
 }
 
 // close enough to the floor that the next step down would put us on it
