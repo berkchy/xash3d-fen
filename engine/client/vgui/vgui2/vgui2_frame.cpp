@@ -32,7 +32,7 @@ extern "C" void VGui2ScreenSize( int width, int height )
 	}
 }
 
-extern "C" int VGui2Paint()
+extern "C" int VGui2Paint( void )
 {
 	vgui2::CISurface *surface = Surface();
 	if( !surface )

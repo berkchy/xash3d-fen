@@ -19,7 +19,7 @@ void VGui2ScreenSize( int width, int height );
 
 // Paint whatever the client library has registered. Returns the number of
 // panels painted; zero means VGUI2 is not in use on this client.
-int VGui2Paint();
+int VGui2Paint( void );
 
 #ifdef __cplusplus
 }
