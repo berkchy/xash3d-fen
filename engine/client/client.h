@@ -1143,6 +1143,11 @@ int VGUI2_FindTexture( const char *name );
 void VGUI2_TextureSize( int texture, int *width, int *height );
 int VGUI2_DrawText( int slot, float x, float y, const char *text, int r, int g, int b, int a );
 void VGUI2_TextSize( int slot, const char *text, int *width, int *height );
+
+// Per-frame hooks for the engine-side VGUI2 in client/vgui/vgui2. Declared
+// in vgui2_paint.h; implemented here because the C++ half cannot include
+// client.h. Both are safe to call on a client that never brought VGUI2 up.
+#include "vgui2_paint.h"
 int Con_DrawString( int x, int y, const char *string, const rgba_t setColor ); // legacy, use cl_font.c
 void GAME_EXPORT Con_DrawStringLen( const char *pText, int *length, int *height ); // legacy, use cl_font.c
 void Con_CharEvent( int key );

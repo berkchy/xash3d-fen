@@ -11,6 +11,7 @@
 #include "vgui2_surface.h"
 
 #include "vgui2_draw.h"
+#include "vgui2_panel.h"
 #include "vgui2_interfaces.decl.inc"
 
 #include <string.h>
@@ -338,6 +339,291 @@ void CISurface::DrawPolyLine( int *px, int *py, int numPoints )
 		DrawLine( px[i - 1], py[i - 1], px[i], py[i] );
 }
 
+// --- panels ---------------------------------------------------------------
+
+void CISurface::AddPanel( VPANEL panel )
+{
+	// One embedded panel drives the whole tree: VGUI2 parents its windows
+	// to surface()->GetEmbeddedPanel() and expects the surface to know
+	// which one is on screen.
+	m_embeddedPanel = panel;
+}
+
+void CISurface::SetEmbeddedPanel( VPANEL panel )
+{
+	m_embeddedPanel = panel;
+}
+
+VPANEL CISurface::GetEmbeddedPanel()
+{
+	return m_embeddedPanel;
+}
+
+void CISurface::ReleasePanel( VPANEL panel )
+{
+	if( panel == m_embeddedPanel )
+		m_embeddedPanel = 0;
+
+	if( panel == m_modalPanel )
+		m_modalPanel = 0;
+
+	for( int i = 0; i < m_popupCount; i++ )
+	{
+		if( m_popups[i] != panel )
+			continue;
+
+		for( int j = i; j < m_popupCount - 1; j++ )
+			m_popups[j] = m_popups[j + 1];
+		m_popupCount--;
+		return;
+	}
+}
+
+void CISurface::PaintTraverse( VPANEL panel )
+{
+	if( panel == 0 || m_panels == NULL )
+		return;
+
+	// The walk itself is IPanel's: it owns the tree, the visibility, the
+	// clip test and the child order. The surface's job is to make sure a 2D
+	// context is open before the first quad goes out, because the client
+	// library may paint from its own frame hook rather than from the
+	// engine's V_PostRender.
+	VGUI2_Enter2D();
+
+	m_panels->PaintTraverse( panel, true, true );
+}
+
+void CISurface::SolveTraverse( VPANEL panel, bool forceApplySchemeSettings )
+{
+	if( panel == 0 || m_panels == NULL )
+		return;
+
+	m_panels->PerformApplySchemeSettings( panel );
+	(void)forceApplySchemeSettings;
+}
+
+// Bring a panel on top of its siblings. Popups keep their own list order
+// too: the last one created is the one the user last asked for, which is
+// what a scoreboard or a loading dialog expects.
+void CISurface::MovePopupToFront( VPANEL panel )
+{
+	for( int i = 0; i < m_popupCount; i++ )
+	{
+		if( m_popups[i] != panel )
+			continue;
+
+		for( int j = i; j < m_popupCount - 1; j++ )
+			m_popups[j] = m_popups[j + 1];
+		m_popups[m_popupCount - 1] = panel;
+		return;
+	}
+}
+
+void CISurface::MovePopupToBack( VPANEL panel )
+{
+	for( int i = 0; i < m_popupCount; i++ )
+	{
+		if( m_popups[i] != panel )
+			continue;
+
+		for( int j = i; j > 0; j-- )
+			m_popups[j] = m_popups[j - 1];
+		m_popups[0] = panel;
+		return;
+	}
+}
+
+int CISurface::GetPopupCount()
+{
+	return m_popupCount;
+}
+
+VPANEL CISurface::GetPopup( int index )
+{
+	if( index < 0 || index >= m_popupCount )
+		return 0;
+
+	return m_popups[index];
+}
+
+void CISurface::CreatePopup( VPANEL panel, bool minimised, bool showTaskbarIcon, bool disabled, bool mouseInput, bool kbInput )
+{
+	if( panel == 0 )
+		return;
+
+	for( int i = 0; i < m_popupCount; i++ )
+	{
+		if( m_popups[i] == panel )
+			return;
+	}
+
+	if( m_popupCount >= kMaxPopups )
+		return;
+
+	// A popup is on screen by the time it is created; the client library
+	// creates it to show something, not to prepare for later.
+	m_popups[m_popupCount++] = panel;
+	MovePopupToFront( panel );
+}
+
+void CISurface::SetPanelVisible( VPANEL panel, bool state )
+{
+}
+
+bool CISurface::ShouldPaintChildPanel( VPANEL childPanel )
+{
+	// Visible, and not behind a modal panel. A modal above it means the
+	// client library wants a dimmed background, not a live scoreboard.
+	if( m_modalPanel != 0 && m_modalPanel != childPanel )
+	{
+		if( m_modalPanel != GetTopmostPopup() )
+			return false;
+	}
+
+	return true;
+}
+
+VPANEL CISurface::GetTopmostPopup()
+{
+	if( m_popupCount <= 0 )
+		return 0;
+
+	return m_popups[m_popupCount - 1];
+}
+
+void CISurface::SetModalPanel( VPANEL panel )
+{
+	m_modalPanel = panel;
+}
+
+VPANEL CISurface::GetModalPanel()
+{
+	return m_modalPanel;
+}
+
+void CISurface::SetForegroundWindow( VPANEL panel )
+{
+}
+
+void CISurface::SetAsTopMost( VPANEL panel, bool state )
+{
+}
+
+void CISurface::BringToFront( VPANEL panel )
+{
+	MovePopupToFront( panel );
+}
+
+void CISurface::SetMinimized( VPANEL panel, bool state )
+{
+}
+
+bool CISurface::IsMinimized( VPANEL panel )
+{
+	return false;
+}
+
+void CISurface::FlashWindow( VPANEL panel, bool state )
+{
+}
+
+void CISurface::SetTitle( VPANEL panel, const wchar_t *title )
+{
+}
+
+void CISurface::SetAsToolBar( VPANEL panel, bool state )
+{
+}
+
+void CISurface::SwapBuffers( VPANEL panel )
+{
+}
+
+void CISurface::Invalidate( VPANEL panel )
+{
+}
+
+// --- cursor ---------------------------------------------------------------
+
+void CISurface::SetCursor( HCursor cursor )
+{
+	// Cursor shapes are the touch cursor this platform already draws, not
+	// 2D bitmaps; a VGUI2 cursor is a position request at most.
+	m_cursorVisible = true;
+}
+
+bool CISurface::IsCursorVisible()
+{
+	return m_cursorVisible;
+}
+
+void CISurface::LockCursor()
+{
+}
+
+void CISurface::UnlockCursor()
+{
+}
+
+bool CISurface::HasCursorPosFunctions()
+{
+	// The engine has no cursor to report: input arrives as touch and as
+	// the mouse position the input code already keeps. Saying "yes" would
+	// make the client library poll a position that never changes.
+	return false;
+}
+
+void CISurface::SurfaceGetCursorPos( int &x, int &y )
+{
+	x = 0;
+	y = 0;
+}
+
+void CISurface::SurfaceSetCursorPos( int x, int y )
+{
+}
+
+void CISurface::CalculateMouseVisible()
+{
+}
+
+bool CISurface::NeedKBInput()
+{
+	return false;
+}
+
+// --- workspace ------------------------------------------------------------
+
+void CISurface::GetWorkspaceBounds( int &x, int &y, int &wide, int &tall )
+{
+	x = 0;
+	y = 0;
+	wide = m_screenSize[0];
+	tall = m_screenSize[1];
+}
+
+void CISurface::GetProportionalBase( int &width, int &height )
+{
+	width = m_proportionalBase[0];
+	height = m_proportionalBase[1];
+}
+
+void CISurface::SetProportionalBase( int width, int height )
+{
+	m_proportionalBase[0] = width;
+	m_proportionalBase[1] = height;
+}
+
+void CISurface::SetHDProportionalBase( int nWidth, int nHeight )
+{
+	m_proportionalBase[0] = nWidth;
+	m_proportionalBase[1] = nHeight;
+}
+
+void CISurface::GetHDProportionalBase( int &width, int &height )
+{
+	GetProportionalBase( width, height );
+}
+
 } // namespace vgui2
-
-

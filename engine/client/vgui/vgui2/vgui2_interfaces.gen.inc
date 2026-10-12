@@ -305,10 +305,6 @@ void CISurface::Shutdown() { }
 
 void CISurface::RunFrame() { }
 
-VPANEL CISurface::GetEmbeddedPanel() { return (VPANEL)0; }
-
-void CISurface::SetEmbeddedPanel( VPANEL pPanel ) { }
-
 void CISurface::PushMakeCurrent(VPANEL panel, bool useInsets) { }
 
 void CISurface::PopMakeCurrent(VPANEL panel) { }
@@ -331,34 +327,6 @@ void CISurface::CopyFrontBufferToBackBuffer() { }
 
 void CISurface::UncacheUnusedMaterials() { }
 
-void CISurface::SetAsTopMost(VPANEL panel, bool state) { }
-
-void CISurface::BringToFront(VPANEL panel) { }
-
-void CISurface::SetForegroundWindow(VPANEL panel) { }
-
-void CISurface::SetPanelVisible(VPANEL panel, bool state) { }
-
-void CISurface::SetMinimized(VPANEL panel, bool state) { }
-
-bool CISurface::IsMinimized(VPANEL panel) { return false; }
-
-void CISurface::FlashWindow(VPANEL panel, bool state) { }
-
-void CISurface::SetTitle(VPANEL panel, const wchar_t *title) { }
-
-void CISurface::SetAsToolBar(VPANEL panel, bool state) { }
-
-void CISurface::CreatePopup(VPANEL panel, bool minimised, bool showTaskbarIcon , bool disabled , bool mouseInput , bool kbInput ) { }
-
-void CISurface::SwapBuffers(VPANEL panel) { }
-
-void CISurface::Invalidate(VPANEL panel) { }
-
-void CISurface::SetCursor(HCursor cursor) { }
-
-bool CISurface::IsCursorVisible() { return false; }
-
 void CISurface::ApplyChanges() { }
 
 bool CISurface::IsWithin(int x, int y) { return false; }
@@ -369,17 +337,7 @@ bool CISurface::SupportsFeature(SurfaceFeature_e feature) { return false; }
 
 void CISurface::RestrictPaintToSinglePanel(VPANEL panel) { }
 
-void CISurface::SetModalPanel(VPANEL ) { }
-
-VPANEL CISurface::GetModalPanel() { return (VPANEL)0; }
-
-void CISurface::UnlockCursor() { }
-
-void CISurface::LockCursor() { }
-
 void CISurface::SetTranslateExtendedKeys(bool state) { }
-
-VPANEL CISurface::GetTopmostPopup() { return (VPANEL)0; }
 
 void CISurface::SetTopLevelFocus(VPANEL panel) { }
 
@@ -397,43 +355,11 @@ void CISurface::SetNotifyIcon(VPANEL context, HTexture icon, VPANEL panelToRecei
 
 void CISurface::PlaySound(const char *fileName) { }
 
-int CISurface::GetPopupCount() { return 0; }
-
-VPANEL CISurface::GetPopup(int index) { return (VPANEL)0; }
-
-bool CISurface::ShouldPaintChildPanel(VPANEL childPanel) { return false; }
-
 bool CISurface::RecreateContext(VPANEL panel) { return false; }
-
-void CISurface::AddPanel(VPANEL panel) { }
-
-void CISurface::ReleasePanel(VPANEL panel) { }
-
-void CISurface::MovePopupToFront(VPANEL panel) { }
-
-void CISurface::MovePopupToBack(VPANEL panel) { }
-
-void CISurface::SolveTraverse(VPANEL panel, bool forceApplySchemeSettings ) { }
-
-void CISurface::PaintTraverse(VPANEL panel) { }
 
 void CISurface::EnableMouseCapture(VPANEL panel, bool state) { }
 
-void CISurface::GetWorkspaceBounds(int &x, int &y, int &wide, int &tall) { }
-
 void CISurface::GetAbsoluteWindowBounds(int &x, int &y, int &wide, int &tall) { }
-
-void CISurface::GetProportionalBase( int &width, int &height ) { }
-
-void CISurface::CalculateMouseVisible() { }
-
-bool CISurface::NeedKBInput() { return false; }
-
-bool CISurface::HasCursorPosFunctions() { return false; }
-
-void CISurface::SurfaceGetCursorPos(int &x, int &y) { }
-
-void CISurface::SurfaceSetCursorPos(int x, int y) { }
 
 void CISurface::DrawTexturedPolygon( VGuiVertex *pVertices, int n) { }
 
@@ -465,13 +391,7 @@ int CISurface::GetFontBlur(vgui2::HFont font) { return 0; }
 
 bool CISurface::IsAdditive(vgui2::HFont font) { return false; }
 
-void CISurface::SetProportionalBase(int width, int height) { }
-
-void CISurface::GetHDProportionalBase(int &width, int &height) { }
-
-void CISurface::SetHDProportionalBase(int nWidth, int nHeight) { }
-
-// CISurface: 85 methods still stubbed - the no-ops above are not
+// CISurface: 45 methods still stubbed - the no-ops above are not
 // finished features, they only keep the class concrete.
 
 } // namespace vgui2

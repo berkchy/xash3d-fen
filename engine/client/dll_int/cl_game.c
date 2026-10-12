@@ -4351,3 +4351,21 @@ void VGUI2_TextSize( int slot, const char *text, int *width, int *height )
 
 	CL_DrawStringLen( font, text, width, height, FONT_DRAW_FORCECOL );
 }
+
+#include "vgui2/vgui2_frame.h"
+#include "vgui2_paint.h"
+
+void VGUI2_SetScreenSize( int width, int height )
+{
+	VGui2ScreenSize( width, height );
+}
+
+int VGUI2_Paint( void )
+{
+	// One in four frames should be plenty: the scoreboard and the loading
+	// dialog do not animate, and this is a per-frame cost on a phone.
+	if( (host.framecount & 3) != 0 )
+		return 0;
+
+	return VGui2Paint();
+}

@@ -534,6 +534,12 @@ void V_PostRender( void )
 		SCR_TileClear();
 		CL_DrawHUD( CL_ACTIVE );
 		VGui_Paint();
+
+		// VGUI2, if this client brought it up. Returns zero on the clients
+		// that do not - libvgui2client.so is not in every APK, and the text
+		// HUD above is what draws the scoreboard there.
+		VGUI2_SetScreenSize( clgame.scrInfo.iWidth, clgame.scrInfo.iHeight );
+		VGUI2_Paint();
 	}
 
 	switch( cls.scrshot_action )

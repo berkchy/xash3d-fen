@@ -372,6 +372,8 @@ public:
 	// tools/gen_vgui2_interfaces.py EXTRA_MEMBERS.
 	CISurface();
 	SurfaceTexture *Find( int id );
+	void SetPanels( CIPanel *panels ) { m_panels = panels; }
+	CIPanel *m_panels;
 	int m_currentTexture;
 	int m_drawColor[4];
 	int m_textColor[4];
