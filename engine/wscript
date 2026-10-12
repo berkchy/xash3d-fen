@@ -195,8 +195,13 @@ def build(bld):
 	# pick Valve's up instead. C++ only, so it links the C++ runtime.
 	vgui2_lib = None
 	if not bld.env.DEDICATED:
-		vgui2_includes = ['.', 'headers', 'headers/tier0', 'headers/tier1',
-			'headers/tier2', 'headers/common', 'headers/mathlib']
+		# Relative to this wscript, not to the sources: waf resolves a
+		# target's includes against the directory holding the wscript.
+		vgui2_dir = 'client/vgui/vgui2'
+		vgui2_includes = [vgui2_dir,
+			vgui2_dir + '/headers', vgui2_dir + '/headers/tier0',
+			vgui2_dir + '/headers/tier1', vgui2_dir + '/headers/tier2',
+			vgui2_dir + '/headers/common', vgui2_dir + '/headers/mathlib']
 		bld.stlib(
 			source   = bld.path.ant_glob('client/vgui/vgui2/*.cpp'),
 			target   = 'vgui2',
