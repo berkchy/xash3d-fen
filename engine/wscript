@@ -204,10 +204,10 @@ def build(bld):
 			features = 'c cxx',
 			use      = 'engine_includes',
 		)
-		# waf resolves entries of `use` by target name unless handed the task
-		# generator itself; the object returned by bld.stlib is not the one
-		# it wants, get_tgen_by_name is.
-		vgui2_lib = bld.get_tgen_by_name('vgui2')
+		# By name, like MultiEmulator: waf looks `use` entries up in the
+		# name -> task generator map it fills from every stlib built in the
+		# tree. Handing it the object from bld.stlib does not work.
+		vgui2_lib = 'vgui2'
 
 	# basic build: dedicated only
 	source = bld.path.ant_glob(['common/*.c', 'common/imagelib/*.c', 'common/soundlib/*.c', 'server/*.c'])
