@@ -93,6 +93,13 @@ IMPLEMENTED = {
         "InternalFocusChanged", "RequestFocus", "RequestFocusPrev",
         "RequestFocusNext", "GetCurrentKeyFocus", "GetTabPosition",
     },
+    "CISchemeManager": {
+        "LoadSchemeFromFile", "ReloadSchemes", "GetDefaultScheme",
+        "GetScheme", "GetIScheme", "GetImage", "GetImageID",
+        "DeleteImage", "GetProportionalScaledValue",
+        "GetProportionalNormalizedValue", "GetProportionalScale",
+        "GetHDProportionalScaledValue", "GetHDProportionalNormalizedValue",
+    },
 }
 
 

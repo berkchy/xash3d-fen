@@ -400,35 +400,9 @@ bool CISurface::IsAdditive(vgui2::HFont font) { return false; }
 // finished features, they only keep the class concrete.
 
 
-HScheme CISchemeManager::LoadSchemeFromFile( const char *fileName, const char *tag ) { return (HScheme)0; }
-
-void CISchemeManager::ReloadSchemes() { }
-
-HScheme CISchemeManager::GetDefaultScheme() { return (HScheme)0; }
-
-HScheme CISchemeManager::GetScheme( const char *tag ) { return (HScheme)0; }
-
-IImage * CISchemeManager::GetImage( const char *imageName, bool hardwareFiltered ) { return NULL; }
-
-HTexture CISchemeManager::GetImageID( const char *imageName, bool hardwareFiltered ) { return (HTexture)0; }
-
-void CISchemeManager::DeleteImage( const char *pImageName ) { }
-
-IScheme * CISchemeManager::GetIScheme( HScheme scheme ) { return NULL; }
-
 void CISchemeManager::Shutdown( bool full ) { }
 
-int CISchemeManager::GetProportionalScaledValue( int normalizedValue ) { return 0; }
-
-int CISchemeManager::GetProportionalNormalizedValue( int scaledValue ) { return 0; }
-
-float CISchemeManager::GetProportionalScale() { return 0; }
-
-int CISchemeManager::GetHDProportionalScaledValue(int normalizedValue) { return 0; }
-
-int CISchemeManager::GetHDProportionalNormalizedValue(int scaledValue) { return 0; }
-
-// CISchemeManager: 14 methods still stubbed - the no-ops above are not
+// CISchemeManager: 1 methods still stubbed - the no-ops above are not
 // finished features, they only keep the class concrete.
 
 
