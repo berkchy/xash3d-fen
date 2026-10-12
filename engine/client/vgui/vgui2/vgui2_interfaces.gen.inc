@@ -99,6 +99,13 @@ const char * CISystem::GetAllUserStartMenuFolderPath() { return NULL; }
 // CISystem: 36 methods still stubbed - the no-ops above are not
 // finished features, they only keep the class concrete.
 
+bool CIVGui::Init( CreateInterfaceFn *factoryList, int numFactories )
+{
+	m_factoryList = factoryList;
+	m_numFactories = numFactories;
+	return false;
+}
+
 
 void CIVGui::Shutdown() { }
 
@@ -278,9 +285,11 @@ void CILocalize::ConstructString(wchar_t *unicodeOutput, int unicodeBufferSizeIn
 // finished features, they only keep the class concrete.
 
 
+bool CIPanel::IsAutoDeleteSet(VPANEL vguiPanel) { return false; }
+
 void CIPanel::Solve(VPANEL vguiPanel) { }
 
-// CIPanel: 1 methods still stubbed - the no-ops above are not
+// CIPanel: 2 methods still stubbed - the no-ops above are not
 // finished features, they only keep the class concrete.
 
 } // namespace vgui2

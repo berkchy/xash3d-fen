@@ -43,7 +43,7 @@ IMPLEMENTED = {
         "IsFullyVisible", "SetZPos", "GetZPos", "SetRenderZPos",
         "GetRenderZPos", "MoveToFront", "MoveToBack", "HasParent", "IsPopup",
         "SetPopup", "Render_GetPopupVisible", "Render_SetPopupVisible",
-        "IsEnabled", "SetEnabled", "SetAutoDelete", "IsAutoDeleteSet",
+        "IsEnabled", "SetEnabled", "SetAutoDelete",
         "SetKeyBoardInputEnabled", "IsKeyBoardInputEnabled",
         "SetMouseInputEnabled", "IsMouseInputEnabled", "SetProportional",
         "IsProportional", "Plat", "SetPlat", "Client", "GetName",
@@ -241,20 +241,11 @@ def emit_declarations(cls, methods, hand):
     out.append("};")
     out.append("")
 
-    # Only the tier1-style Init(CreateInterfaceFn*, int) gets a body here.
-    # IPanel::Init(VPANEL, IClientPanel*) is a different thing and is
-    # implemented by hand in vgui2_panel.cpp.
-    init = [m for m in init if "CreateInterfaceFn" in m[2]]
-    if init:
-        ret, _, args = init[0]
-        out.append("%s C%s::Init(%s)" % (ret, cls, args))
-        out.append("{")
-        out.append("\tm_factoryList = factoryList;")
-        out.append("\tm_numFactories = numFactories;")
-        if ret != "void":
-            out.append("\treturn %s;" % zero_value(ret))
-        out.append("}")
-        out.append("")
+    # No Init definition here. This file is included by every translation
+    # unit that needs the classes; the definition belongs in the one that
+    # emits bodies, or it lands in two objects and the link fails on
+    # duplicate symbols.
+    return out
 
     # No definitions here. A hand-implemented method is declared and then
     # defined in the file that implements it - defining it here as well
@@ -270,6 +261,19 @@ def emit_stubs(cls, methods, hand):
     stub is never mistaken for a finished feature.
     """
     out = []
+
+    init = [m for m in methods if m[1] == "Init" and "CreateInterfaceFn" in m[2]]
+    if init:
+        ret, _, args = init[0]
+        out.append("%s C%s::Init(%s)" % (ret, cls, args))
+        out.append("{")
+        out.append("\tm_factoryList = factoryList;")
+        out.append("\tm_numFactories = numFactories;")
+        if ret != "void":
+            out.append("\treturn %s;" % zero_value(ret))
+        out.append("}")
+        out.append("")
+
     stubbed = [m for m in methods if m[1] not in hand and m[1] != "Init"]
     for return_type, name, args in stubbed:
         out.append("")
