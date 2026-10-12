@@ -20,6 +20,14 @@
 #include <vgui/IVGui.h>
 #include <vgui_controls/Panel.h>
 
+// Types the generated CISurface members refer to. Included here so
+// the declarations stand on their own; guarded because the hand
+// written file includes it too.
+#ifndef VGUI2_SURFACE_H
+#define VGUI2_SURFACE_H
+#include "vgui2_surface.h"
+#endif
+
 namespace vgui2
 {
 
@@ -241,6 +249,148 @@ public:
 	void SetEnabled(VPANEL vguiPanel, bool state);
 	IClientPanel* Client( VPANEL vguiPanel );
 	const char* GetModuleName( VPANEL vguiPanel );
+
+	CreateInterfaceFn *m_factoryList = nullptr;
+	int m_numFactories = 0;
+};
+
+
+class CISurface : public vgui2::ISurface
+{
+public:
+	void Shutdown();
+	void RunFrame();
+	VPANEL GetEmbeddedPanel();
+	void SetEmbeddedPanel( VPANEL pPanel );
+	void PushMakeCurrent(VPANEL panel, bool useInsets);
+	void PopMakeCurrent(VPANEL panel);
+	void DrawSetColor(int r, int g, int b, int a);
+	void DrawSetColor( Color col);
+	void DrawFilledRect(int x0, int y0, int x1, int y1);
+	void DrawOutlinedRect(int x0, int y0, int x1, int y1);
+	void DrawLine(int x0, int y0, int x1, int y1);
+	void DrawPolyLine(int *px, int *py, int numPoints);
+	void DrawSetTextFont(HFont font);
+	void DrawSetTextColor(int r, int g, int b, int a);
+	void DrawSetTextColor( Color col);
+	void DrawSetTextPos(int x, int y);
+	void DrawGetTextPos(int& x,int& y);
+	void DrawPrintText(const wchar_t *text, int textLen  );
+	void DrawUnicodeChar(wchar_t wch  );
+	void DrawUnicodeCharAdd( wchar_t wch );
+	void DrawFlushText();
+	IHTML * CreateHTMLWindow(vgui2::IHTMLEvents *events,VPANEL context);
+	void PaintHTMLWindow(vgui2::IHTML *htmlwin);
+	void DeleteHTMLWindow(IHTML *htmlwin);
+	void DrawSetTextureFile(int id, const char *filename, int hardwareFilter, bool forceReload);
+	void DrawSetTextureRGBA(int id, const unsigned char *rgba, int wide, int tall, int hardwareFilter, bool forceReload);
+	void DrawSetTexture(int id);
+	void DrawGetTextureSize(int id, int &wide, int &tall);
+	void DrawTexturedRect(int x0, int y0, int x1, int y1);
+	bool IsTextureIDValid(int id);
+	int CreateNewTextureID( bool procedural );
+	void DestroyTextureID( int id );
+	bool IsCachedForRendering( int id, bool bSyncWait );
+	void CopyFrontBufferToBackBuffer();
+	void UncacheUnusedMaterials();
+	void GetScreenSize(int &wide, int &tall);
+	void SetAsTopMost(VPANEL panel, bool state);
+	void BringToFront(VPANEL panel);
+	void SetForegroundWindow(VPANEL panel);
+	void SetPanelVisible(VPANEL panel, bool state);
+	void SetMinimized(VPANEL panel, bool state);
+	bool IsMinimized(VPANEL panel);
+	void FlashWindow(VPANEL panel, bool state);
+	void SetTitle(VPANEL panel, const wchar_t *title);
+	void SetAsToolBar(VPANEL panel, bool state);
+	void CreatePopup(VPANEL panel, bool minimised, bool showTaskbarIcon , bool disabled , bool mouseInput , bool kbInput );
+	void SwapBuffers(VPANEL panel);
+	void Invalidate(VPANEL panel);
+	void SetCursor(HCursor cursor);
+	bool IsCursorVisible();
+	void ApplyChanges();
+	bool IsWithin(int x, int y);
+	bool HasFocus();
+	bool SupportsFeature(SurfaceFeature_e feature);
+	void RestrictPaintToSinglePanel(VPANEL panel);
+	void SetModalPanel(VPANEL );
+	VPANEL GetModalPanel();
+	void UnlockCursor();
+	void LockCursor();
+	void SetTranslateExtendedKeys(bool state);
+	VPANEL GetTopmostPopup();
+	void SetTopLevelFocus(VPANEL panel);
+	HFont CreateFont();
+	bool AddGlyphSetToFont(HFont font, const char *windowsFontName, int tall, int weight, int blur, int scanlines, int flags, int lowRange, int highRange);
+	bool AddCustomFontFile(const char *fontFileName);
+	int GetFontTall(HFont font);
+	void GetCharABCwide(HFont font, int ch, int &a, int &b, int &c);
+	int GetCharacterWidth(HFont font, int ch);
+	void GetTextSize(HFont font, const wchar_t *text, int &wide, int &tall);
+	VPANEL GetNotifyPanel();
+	void SetNotifyIcon(VPANEL context, HTexture icon, VPANEL panelToReceiveMessages, const char *text);
+	void PlaySound(const char *fileName);
+	int GetPopupCount();
+	VPANEL GetPopup(int index);
+	bool ShouldPaintChildPanel(VPANEL childPanel);
+	bool RecreateContext(VPANEL panel);
+	void AddPanel(VPANEL panel);
+	void ReleasePanel(VPANEL panel);
+	void MovePopupToFront(VPANEL panel);
+	void MovePopupToBack(VPANEL panel);
+	void SolveTraverse(VPANEL panel, bool forceApplySchemeSettings );
+	void PaintTraverse(VPANEL panel);
+	void EnableMouseCapture(VPANEL panel, bool state);
+	void GetWorkspaceBounds(int &x, int &y, int &wide, int &tall);
+	void GetAbsoluteWindowBounds(int &x, int &y, int &wide, int &tall);
+	void GetProportionalBase( int &width, int &height );
+	void CalculateMouseVisible();
+	bool NeedKBInput();
+	bool HasCursorPosFunctions();
+	void SurfaceGetCursorPos(int &x, int &y);
+	void SurfaceSetCursorPos(int x, int y);
+	void DrawTexturedPolygon( VGuiVertex *pVertices, int n);
+	int GetFontAscent( HFont font, wchar_t wch );
+	void SetAllowHTMLJavaScript( bool state );
+	void SetLanguage( const char* pchLang );
+	const char* GetLanguage();
+	bool DeleteTextureByID( int id );
+	void DrawUpdateRegionTextureBGRA( int nTextureID, int x, int y, const unsigned char *pchData, int wide, int tall );
+	void DrawSetTextureBGRA( int id, const unsigned char *pchData, int wide, int tall );
+	void CreateBrowser( vgui2::VPANEL panel, IHTMLResponses *pBrowser, bool bPopupWindow, const char *pchUserAgentIdentifier );
+	void RemoveBrowser( vgui2::VPANEL panel, IHTMLResponses *pBrowser );
+	IHTMLChromeController * AccessChromeHTMLController();
+	void DrawTexturedRectAdd(int x0, int y0, int x1, int y1);
+	void SetSupportsEsc(bool bSupportsEsc);
+	int GetFontBlur(vgui2::HFont font);
+	bool IsAdditive(vgui2::HFont font);
+	void SetProportionalBase(int width, int height);
+	void GetHDProportionalBase(int &width, int &height);
+	void SetHDProportionalBase(int nWidth, int nHeight);
+
+	// Implementation-side members and helpers, from
+	// tools/gen_vgui2_interfaces.py EXTRA_MEMBERS.
+	CISurface();
+	SurfaceTexture *Find( int id );
+	int m_currentTexture;
+	int m_drawColor[4];
+	int m_textColor[4];
+	int m_textPos[2];
+	int m_font;
+	int m_proportionalBase[2];
+	int m_screenSize[2];
+	bool m_cursorVisible;
+	bool m_hasFocus;
+	VPANEL m_embeddedPanel;
+	VPANEL m_modalPanel;
+	VPANEL m_notifyPanel;
+	vgui2::CVGui2FontSet m_fonts;
+	vgui2::SurfaceTexture m_textures[vgui2::kMaxTextures];
+	int m_textureCount;
+	int m_freeTextures[vgui2::kMaxTextures];
+	int m_freeTextureCount;
+	VPANEL m_popups[vgui2::kMaxPopups];
+	int m_popupCount;
 
 	CreateInterfaceFn *m_factoryList = nullptr;
 	int m_numFactories = 0;

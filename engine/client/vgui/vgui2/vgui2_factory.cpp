@@ -24,6 +24,7 @@
 #include <vgui/IInputInternal.h>
 
 #include "vgui2_panel.h"
+#include "vgui2_surface.h"
 
 #include "vgui2_interfaces.decl.inc"
 #include "vgui2_interfaces.gen.inc"
@@ -39,6 +40,7 @@ namespace {
 
 vgui2::CVGui2PanelManager g_panels;
 vgui2::CIPanel    g_panel;
+vgui2::CISurface  g_surface;
 vgui2::CISystem  g_system;
 vgui2::CIVGui     g_vgui;
 vgui2::CIInputInternal g_input;
@@ -53,6 +55,7 @@ struct Entry
 const Entry kInterfaces[] =
 {
 	{ VGUI_PANEL_INTERFACE_VERSION_GS,          &g_panel },
+	{ VGUI_SURFACE_INTERFACE_VERSION_GS,        &g_surface },
 	{ VGUI_SYSTEM_INTERFACE_VERSION_GS,         &g_system },
 	{ VGUI_IVGUI_INTERFACE_VERSION_GS,          &g_vgui },
 	{ VGUI_INPUTINTERNAL_INTERFACE_VERSION,     &g_input },

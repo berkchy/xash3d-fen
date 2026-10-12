@@ -20,6 +20,14 @@
 #include <vgui/IVGui.h>
 #include <vgui_controls/Panel.h>
 
+// Types the generated CISurface members refer to. Included here so
+// the declarations stand on their own; guarded because the hand
+// written file includes it too.
+#ifndef VGUI2_SURFACE_H
+#define VGUI2_SURFACE_H
+#include "vgui2_surface.h"
+#endif
+
 namespace vgui2
 {
 
@@ -290,6 +298,180 @@ bool CIPanel::IsAutoDeleteSet(VPANEL vguiPanel) { return false; }
 void CIPanel::Solve(VPANEL vguiPanel) { }
 
 // CIPanel: 2 methods still stubbed - the no-ops above are not
+// finished features, they only keep the class concrete.
+
+
+void CISurface::Shutdown() { }
+
+void CISurface::RunFrame() { }
+
+VPANEL CISurface::GetEmbeddedPanel() { return (VPANEL)0; }
+
+void CISurface::SetEmbeddedPanel( VPANEL pPanel ) { }
+
+void CISurface::PushMakeCurrent(VPANEL panel, bool useInsets) { }
+
+void CISurface::PopMakeCurrent(VPANEL panel) { }
+
+void CISurface::DrawUnicodeChar(wchar_t wch  ) { }
+
+void CISurface::DrawUnicodeCharAdd( wchar_t wch ) { }
+
+void CISurface::DrawFlushText() { }
+
+IHTML * CISurface::CreateHTMLWindow(vgui2::IHTMLEvents *events,VPANEL context) { return NULL; }
+
+void CISurface::PaintHTMLWindow(vgui2::IHTML *htmlwin) { }
+
+void CISurface::DeleteHTMLWindow(IHTML *htmlwin) { }
+
+bool CISurface::IsCachedForRendering( int id, bool bSyncWait ) { return false; }
+
+void CISurface::CopyFrontBufferToBackBuffer() { }
+
+void CISurface::UncacheUnusedMaterials() { }
+
+void CISurface::SetAsTopMost(VPANEL panel, bool state) { }
+
+void CISurface::BringToFront(VPANEL panel) { }
+
+void CISurface::SetForegroundWindow(VPANEL panel) { }
+
+void CISurface::SetPanelVisible(VPANEL panel, bool state) { }
+
+void CISurface::SetMinimized(VPANEL panel, bool state) { }
+
+bool CISurface::IsMinimized(VPANEL panel) { return false; }
+
+void CISurface::FlashWindow(VPANEL panel, bool state) { }
+
+void CISurface::SetTitle(VPANEL panel, const wchar_t *title) { }
+
+void CISurface::SetAsToolBar(VPANEL panel, bool state) { }
+
+void CISurface::CreatePopup(VPANEL panel, bool minimised, bool showTaskbarIcon , bool disabled , bool mouseInput , bool kbInput ) { }
+
+void CISurface::SwapBuffers(VPANEL panel) { }
+
+void CISurface::Invalidate(VPANEL panel) { }
+
+void CISurface::SetCursor(HCursor cursor) { }
+
+bool CISurface::IsCursorVisible() { return false; }
+
+void CISurface::ApplyChanges() { }
+
+bool CISurface::IsWithin(int x, int y) { return false; }
+
+bool CISurface::HasFocus() { return false; }
+
+bool CISurface::SupportsFeature(SurfaceFeature_e feature) { return false; }
+
+void CISurface::RestrictPaintToSinglePanel(VPANEL panel) { }
+
+void CISurface::SetModalPanel(VPANEL ) { }
+
+VPANEL CISurface::GetModalPanel() { return (VPANEL)0; }
+
+void CISurface::UnlockCursor() { }
+
+void CISurface::LockCursor() { }
+
+void CISurface::SetTranslateExtendedKeys(bool state) { }
+
+VPANEL CISurface::GetTopmostPopup() { return (VPANEL)0; }
+
+void CISurface::SetTopLevelFocus(VPANEL panel) { }
+
+bool CISurface::AddGlyphSetToFont(HFont font, const char *windowsFontName, int tall, int weight, int blur, int scanlines, int flags, int lowRange, int highRange) { return false; }
+
+bool CISurface::AddCustomFontFile(const char *fontFileName) { return false; }
+
+void CISurface::GetCharABCwide(HFont font, int ch, int &a, int &b, int &c) { }
+
+int CISurface::GetCharacterWidth(HFont font, int ch) { return 0; }
+
+VPANEL CISurface::GetNotifyPanel() { return (VPANEL)0; }
+
+void CISurface::SetNotifyIcon(VPANEL context, HTexture icon, VPANEL panelToReceiveMessages, const char *text) { }
+
+void CISurface::PlaySound(const char *fileName) { }
+
+int CISurface::GetPopupCount() { return 0; }
+
+VPANEL CISurface::GetPopup(int index) { return (VPANEL)0; }
+
+bool CISurface::ShouldPaintChildPanel(VPANEL childPanel) { return false; }
+
+bool CISurface::RecreateContext(VPANEL panel) { return false; }
+
+void CISurface::AddPanel(VPANEL panel) { }
+
+void CISurface::ReleasePanel(VPANEL panel) { }
+
+void CISurface::MovePopupToFront(VPANEL panel) { }
+
+void CISurface::MovePopupToBack(VPANEL panel) { }
+
+void CISurface::SolveTraverse(VPANEL panel, bool forceApplySchemeSettings ) { }
+
+void CISurface::PaintTraverse(VPANEL panel) { }
+
+void CISurface::EnableMouseCapture(VPANEL panel, bool state) { }
+
+void CISurface::GetWorkspaceBounds(int &x, int &y, int &wide, int &tall) { }
+
+void CISurface::GetAbsoluteWindowBounds(int &x, int &y, int &wide, int &tall) { }
+
+void CISurface::GetProportionalBase( int &width, int &height ) { }
+
+void CISurface::CalculateMouseVisible() { }
+
+bool CISurface::NeedKBInput() { return false; }
+
+bool CISurface::HasCursorPosFunctions() { return false; }
+
+void CISurface::SurfaceGetCursorPos(int &x, int &y) { }
+
+void CISurface::SurfaceSetCursorPos(int x, int y) { }
+
+void CISurface::DrawTexturedPolygon( VGuiVertex *pVertices, int n) { }
+
+int CISurface::GetFontAscent( HFont font, wchar_t wch ) { return 0; }
+
+void CISurface::SetAllowHTMLJavaScript( bool state ) { }
+
+void CISurface::SetLanguage( const char* pchLang ) { }
+
+const char* CISurface::GetLanguage() { return NULL; }
+
+bool CISurface::DeleteTextureByID( int id ) { return false; }
+
+void CISurface::DrawUpdateRegionTextureBGRA( int nTextureID, int x, int y, const unsigned char *pchData, int wide, int tall ) { }
+
+void CISurface::DrawSetTextureBGRA( int id, const unsigned char *pchData, int wide, int tall ) { }
+
+void CISurface::CreateBrowser( vgui2::VPANEL panel, IHTMLResponses *pBrowser, bool bPopupWindow, const char *pchUserAgentIdentifier ) { }
+
+void CISurface::RemoveBrowser( vgui2::VPANEL panel, IHTMLResponses *pBrowser ) { }
+
+IHTMLChromeController * CISurface::AccessChromeHTMLController() { return NULL; }
+
+void CISurface::DrawTexturedRectAdd(int x0, int y0, int x1, int y1) { }
+
+void CISurface::SetSupportsEsc(bool bSupportsEsc) { }
+
+int CISurface::GetFontBlur(vgui2::HFont font) { return 0; }
+
+bool CISurface::IsAdditive(vgui2::HFont font) { return false; }
+
+void CISurface::SetProportionalBase(int width, int height) { }
+
+void CISurface::GetHDProportionalBase(int &width, int &height) { }
+
+void CISurface::SetHDProportionalBase(int nWidth, int nHeight) { }
+
+// CISurface: 85 methods still stubbed - the no-ops above are not
 // finished features, they only keep the class concrete.
 
 } // namespace vgui2

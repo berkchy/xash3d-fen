@@ -28,6 +28,7 @@ DEFAULT_CLASSES = [
     ("IInputInternal", "IInputInternal"),
     ("ILocalize", "ILocalize"),
     ("IPanel", "IPanel"),
+    ("ISurface", "ISurface"),
 ]
 
 # Methods with a real body in another file. The generator emits their
@@ -35,6 +36,15 @@ DEFAULT_CLASSES = [
 # file keeps; anything missing from this set gets a stub instead, which is
 # how the tree in vgui2_panel.cpp and the rest stay in step.
 IMPLEMENTED = {
+    "CISurface": {
+        "DrawSetColor", "DrawFilledRect", "DrawOutlinedRect", "DrawLine",
+        "DrawPolyLine", "DrawSetTextColor", "DrawSetTextPos",
+        "DrawGetTextPos", "DrawPrintText", "CreateNewTextureID",
+        "DestroyTextureID", "IsTextureIDValid", "DrawSetTexture",
+        "DrawGetTextureSize", "DrawSetTextureFile", "DrawSetTextureRGBA",
+        "DrawTexturedRect", "CreateFont", "DrawSetTextFont",
+        "GetFontTall", "GetTextSize", "GetScreenSize",
+    },
     "CIPanel": {
         "Init", "SetPos", "GetPos", "GetAbsPos", "SetSize", "GetSize",
         "SetMinimumSize", "GetMinimumSize", "OnSizeChanged", "SetInset",
@@ -130,11 +140,49 @@ def bases(text, name):
 # stock IsFullyVisible answers from the visible flag alone and ignores the
 # clip rectangle. Declared in the generated class so the hand-written file
 # can override them.
+# Data members a hand-written implementation needs on the generated class.
+# They go in the same declaration, because a second class of the same name in
+# one translation unit is a redefinition.
+EXTRA_MEMBERS = {
+    "CISurface": [
+        "CISurface();",
+        "SurfaceTexture *Find( int id );",
+        "int m_currentTexture;",
+        "int m_drawColor[4];",
+        "int m_textColor[4];",
+        "int m_textPos[2];",
+        "int m_font;",
+        "int m_proportionalBase[2];",
+        "int m_screenSize[2];",
+        "bool m_cursorVisible;",
+        "bool m_hasFocus;",
+        "VPANEL m_embeddedPanel;",
+        "VPANEL m_modalPanel;",
+        "VPANEL m_notifyPanel;",
+        "vgui2::CVGui2FontSet m_fonts;",
+        "vgui2::SurfaceTexture m_textures[vgui2::kMaxTextures];",
+        "int m_textureCount;",
+        "int m_freeTextures[vgui2::kMaxTextures];",
+        "int m_freeTextureCount;",
+        "VPANEL m_popups[vgui2::kMaxPopups];",
+        "int m_popupCount;",
+    ],
+}
+
 EXTRA_OVERRIDES = {
     # IsFullyVisible, SetAutoDelete, SetRenderZPos and friends are commented
     # out in Valve's GoldSource IPanel - the GS build disabled them - so they
     # are not part of the interface and overriding them would only produce
     # methods nothing calls. Only what the header really declares goes here.
+    "CISurface": {
+        "DrawSetColor", "DrawFilledRect", "DrawOutlinedRect", "DrawLine",
+        "DrawPolyLine", "DrawSetTextColor", "DrawSetTextPos",
+        "DrawGetTextPos", "DrawPrintText", "CreateNewTextureID",
+        "DestroyTextureID", "IsTextureIDValid", "DrawSetTexture",
+        "DrawGetTextureSize", "DrawSetTextureFile", "DrawSetTextureRGBA",
+        "DrawTexturedRect", "CreateFont", "DrawSetTextFont",
+        "GetFontTall", "GetTextSize", "GetScreenSize",
+    },
     "CIPanel": {
         "GetTabPosition",
     },
@@ -235,6 +283,14 @@ def emit_declarations(cls, methods, hand):
     for return_type, name, args in body_methods:
         out.append("\t%s %s(%s);" % (return_type, name, args))
 
+    members = EXTRA_MEMBERS.get("C%s" % cls, [])
+    if members:
+        out.append("")
+        out.append("\t// Implementation-side members and helpers, from")
+        out.append("\t// tools/gen_vgui2_interfaces.py EXTRA_MEMBERS.")
+        for member in members:
+            out.append("\t%s" % member)
+
     out.append("")
     out.append("\tCreateInterfaceFn *m_factoryList = nullptr;")
     out.append("\tint m_numFactories = 0;")
@@ -318,6 +374,14 @@ def main():
         "#include <vgui/ISystem.h>",
         "#include <vgui/IVGui.h>",
         "#include <vgui_controls/Panel.h>",
+        "",
+        "// Types the generated CISurface members refer to. Included here so",
+        "// the declarations stand on their own; guarded because the hand",
+        "// written file includes it too.",
+        "#ifndef VGUI2_SURFACE_H",
+        "#define VGUI2_SURFACE_H",
+        "#include \"vgui2_surface.h\"",
+        "#endif",
         "",
         "namespace vgui2",
         "{",
