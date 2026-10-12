@@ -197,13 +197,17 @@ def build(bld):
 	if not bld.env.DEDICATED:
 		vgui2_includes = ['.', 'headers', 'headers/tier0', 'headers/tier1',
 			'headers/tier2', 'headers/common', 'headers/mathlib']
-		vgui2_lib = bld.stlib(
+		bld.stlib(
 			source   = bld.path.ant_glob('client/vgui/vgui2/*.cpp'),
 			target   = 'vgui2',
 			includes = vgui2_includes,
 			features = 'c cxx',
 			use      = 'engine_includes',
 		)
+		# waf resolves entries of `use` by target name unless handed the task
+		# generator itself; the object returned by bld.stlib is not the one
+		# it wants, get_tgen_by_name is.
+		vgui2_lib = bld.get_tgen_by_name('vgui2')
 
 	# basic build: dedicated only
 	source = bld.path.ant_glob(['common/*.c', 'common/imagelib/*.c', 'common/soundlib/*.c', 'server/*.c'])
