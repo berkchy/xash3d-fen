@@ -302,4 +302,42 @@ void CISurface::GetScreenSize( int &wide, int &tall )
 	tall = m_screenSize[1];
 }
 
+// Shapes that are not rectangles. The renderer's 2D path has lines only as
+// textured quads, and VGUI2 asks for them for separators and focus borders;
+// a texture per line is not worth it at this call rate.
+void CISurface::DrawLine( int x0, int y0, int x1, int y1 )
+{
+	int dx = x1 - x0, dy = y1 - y0;
+	int stepX = dx < 0 ? -1 : 1, stepY = dy < 0 ? -1 : 1;
+	dx = dx < 0 ? -dx : dx;
+	dy = dy < 0 ? -dy : dy;
+
+	int x = x0, y = y0;
+	int error = dx - dy;
+
+	while( true )
+	{
+		VGUI2_FillRect( x, y, x + 1, y + 1,
+			m_drawColor[0], m_drawColor[1], m_drawColor[2], m_drawColor[3] );
+
+		if( x == x1 && y == y1 )
+			break;
+
+		int doubled = error * 2;
+		if( doubled > -dy ) { error -= dy; x += stepX; }
+		if( doubled < dx ) { error += dx; y += stepY; }
+	}
+}
+
+void CISurface::DrawPolyLine( int *px, int *py, int numPoints )
+{
+	if( !px || !py || numPoints < 2 )
+		return;
+
+	for( int i = 1; i < numPoints; i++ )
+		DrawLine( px[i - 1], py[i - 1], px[i], py[i] );
+}
+
 } // namespace vgui2
+
+

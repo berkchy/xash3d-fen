@@ -13,6 +13,13 @@
 
 #include <stddef.h>
 
+// The implementations are C (dll_int/cl_game.c), so the declarations here
+// need C linkage or the C++ side mangles them and the link fails on seven
+// unresolved externals that all look like a missing file.
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Valve's GoldSource ISurface has no scissor rectangle at all - this build
 // of it has no EnableScissor, no SetScissorRect - so there is nothing to
 // push down here. Clipping is done by not drawing what falls outside.
@@ -41,3 +48,7 @@ void VGUI2_TextureSize( int texture, int *width, int *height );
 // font. Returns the advance of the last character drawn.
 int VGUI2_DrawText( int slot, float x, float y, const char *text, int r, int g, int b, int a );
 void VGUI2_TextSize( int slot, const char *text, int *width, int *height );
+
+#ifdef __cplusplus
+}
+#endif
