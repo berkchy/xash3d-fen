@@ -22,6 +22,17 @@ HEADERS = [None]
 # Interfaces the client library asks the factory for, in the order
 # vgui2/src/tier2/tier2.cpp asks for them. SURFACE and PANEL are the ones that
 # do the real work and are implemented separately; the rest are thin.
+# class name -> header file, when they differ
+HEADER_FOR = {
+    "ISchemeManager": "IScheme",
+    "IFileSystem": "FileSystem",
+    "IGameUI": "IGameUI",
+    "IGameConsole": "IGameConsole",
+    "IGameUIFuncs": "IGameUIFuncs",
+    "IEngineVGui": "IEngineVGui",
+    "IBaseUI": "IBaseUI",
+}
+
 DEFAULT_CLASSES = [
     ("ISystem", "ISystem"),
     ("IVGui", "IVGui"),
@@ -29,6 +40,13 @@ DEFAULT_CLASSES = [
     ("ILocalize", "ILocalize"),
     ("IPanel", "IPanel"),
     ("ISurface", "ISurface"),
+    ("ISchemeManager", "IScheme"),
+    ("IGameUI", "IGameUI"),
+    ("IGameConsole", "IGameConsole"),
+    ("IGameUIFuncs", "IGameUIFuncs"),
+    ("IEngineVGui", "IEngineVGui"),
+    ("IBaseUI", "IBaseUI"),
+    ("IFileSystem", "FileSystem"),
 ]
 
 # Methods with a real body in another file. The generator emits their
@@ -120,7 +138,17 @@ def strip_defaults(args):
 
 
 def parse(signature):
-    match = re.match(r"(.*?)\b(\w+)\s*\((.*)\)\s*$", signature.strip())
+    signature = signature.strip()
+
+    # A const member function keeps the const in its declaration - without
+    # it the member does not override and the class stays abstract - but the
+    # out-of-class definition must not repeat it. The flag is carried
+    # through parse() and dropped where definitions are emitted.
+    is_const = bool(re.search(r"\)\s*const\s*$", signature))
+    signature = re.sub(r"\s+const\s*$", "", signature)
+
+    # re.S: several of these signatures wrap across lines.
+    match = re.match(r"(.*?)\b(\w+)\s*\((.*)\)\s*$", signature, re.S)
     if not match:
         raise SystemExit("cannot parse %r" % signature)
     return_type = match.group(1).strip()
@@ -128,7 +156,7 @@ def parse(signature):
     args = strip_defaults(match.group(3))
     if not return_type:
         return_type = "void"
-    return return_type, name, args
+    return return_type, name, args, is_const
 
 
 def strip_comments(text):
@@ -156,6 +184,11 @@ def bases(text, name):
 # They go in the same declaration, because a second class of the same name in
 # one translation unit is a redefinition.
 EXTRA_MEMBERS = {
+    "CISchemeManager": [
+        "CISchemeManager();",
+        "int m_proportionalBase[2];",
+        "int m_screenSize[2];",
+    ],
     "CISurface": [
         "CISurface();",
         "SurfaceTexture *Find( int id );",
@@ -218,7 +251,7 @@ EXTRA_OVERRIDES = {
 def extra_signature(text, name, method):
     """Find the base declaration of a non-pure virtual so it can be mirrored."""
     body = strip_comments(text)
-    for match in re.finditer(r"virtual\s+(.*?)\s*(?:=\s*0)?\s*;", body, re.S):
+    for match in re.finditer(r"virtual\s+([^;{]*?)\s*(?:=\s*0)?\s*;", body, re.S):
         sig = re.sub(r"\s+", " ", match.group(1)).strip()
         parsed = parse(sig)
         if parsed[1] == method:
@@ -242,7 +275,7 @@ def virtuals(text, name, seen=None):
     text = strip_comments(text)
     body = class_body(text, name)
     found = []
-    for match in re.finditer(r"virtual\s+(.*?)\s*=\s*0\s*;", body, re.S):
+    for match in re.finditer(r"virtual\s+([^;{]*?)\s*=\s*0\s*;", body, re.S):
         found.append(parse(match.group(1)))
 
     for base in bases(text, name):
@@ -283,7 +316,7 @@ def collect_with_overrides(text, cls, methods, hand):
     if not extra:
         return methods
 
-    known = {name for _, name, _ in methods}
+    known = {name for _, name, _, _ in methods}
     result = list(methods)
     for method in sorted(extra):
         if method in known:
@@ -294,20 +327,52 @@ def collect_with_overrides(text, cls, methods, hand):
     return result
 
 
-def emit_declarations(cls, methods, hand):
+def namespace_of(text, cls):
+    """Which namespace the class is declared in.
+
+    Most of Valve's VGUI2 is inside `namespace vgui2`, but IGameUI,
+    IBaseUI and IFileSystem are not - they predate it. Qualifying those
+    with vgui2:: produces "expected class name", so the base is written the
+    way the header declares it.
+    """
+    index = text.find("class %s" % cls)
+    if index < 0:
+        return "vgui2"
+
+    before = text[:index]
+    if "namespace vgui2" not in before:
+        return ""
+
+    # A closing brace of the namespace after its last opening means we are
+    # outside it again.
+    opens = before.count("namespace vgui2")
+    closes = before.count("}")
+    return "vgui2" if opens > closes else ""
+
+
+def emit_declarations(cls, methods, hand, base=""):
     """Class declaration only. Safe to include from many translation units."""
-    out = ["class C%s : public vgui2::%s" % (cls, cls), "{", "public:"]
+    qualified = ("%s::%s" % (base, cls)) if base else cls
+    out = ["class C%s : public %s" % (cls, qualified), "{", "public:"]
 
     init = [m for m in methods if m[1] == "Init"]
     body_methods = [m for m in methods if m[1] != "Init"]
     if init:
-        ret, _, args = init[0]
-        out.append("\t%s Init(%s);" % (ret, args))
+        out.append("\t%s Init(%s);" % (init[0][0], init[0][2]))
     # Shutdown is declared by the header like every other method; writing it
     # out here as well is a redeclaration, not a default.
 
-    for return_type, name, args in body_methods:
-        out.append("\t%s %s(%s);" % (return_type, name, args))
+    for entry in body_methods:
+        return_type, name, args = entry[0], entry[1], entry[2]
+        is_const = entry[3] if len(entry) > 3 else False
+
+        # A destructor arrives as "~ IEngineVGui( void )": no return type,
+        # and its name does not carry a scope, so emitting it as a normal
+        # member produces "expected the class name after '~'".
+        if return_type.strip() == "~":
+            continue
+        out.append("\t%s %s(%s)%s;" % (return_type, name, args,
+                                        " const" if is_const else ""))
 
     members = EXTRA_MEMBERS.get("C%s" % cls, [])
     if members:
@@ -343,10 +408,11 @@ def emit_stubs(cls, methods, hand):
     stub is never mistaken for a finished feature.
     """
     out = []
+    _ = cls
 
     init = [m for m in methods if m[1] == "Init" and "CreateInterfaceFn" in m[2]]
     if init:
-        ret, _, args = init[0]
+        ret, args = init[0][0], init[0][2]
         out.append("%s C%s::Init(%s)" % (ret, cls, args))
         out.append("{")
         out.append("\tm_factoryList = factoryList;")
@@ -357,13 +423,29 @@ def emit_stubs(cls, methods, hand):
         out.append("")
 
     stubbed = [m for m in methods if m[1] not in hand and m[1] != "Init"]
-    for return_type, name, args in stubbed:
+    for entry in stubbed:
+        return_type, name, args = entry[0], entry[1], entry[2]
+        # A const member function repeats its const in the out-of-class
+        # definition. Unlike a default argument - which belongs to the
+        # declaration alone and must not be repeated - the const is part of
+        # the declarator, and leaving it off makes the definition match
+        # nothing.
+        is_const = entry[3] if len(entry) > 3 else False
+        # Destructors, for the reason given in emit_declarations.
+        if return_type.strip() == "~":
+            continue
+
+        # Some declarations carry the keyword with the type, e.g.
+        # "virtual vgui2::VPANEL GetPanel(...)"; the definition must not.
+        return_type = re.sub(r"^virtual\s+", "", return_type.strip())
+
         out.append("")
+        tail = " const" if is_const else ""
         if return_type == "void":
-            out.append("void C%s::%s(%s) { }" % (cls, name, args))
+            out.append("void C%s::%s(%s)%s { }" % (cls, name, args, tail))
         else:
-            out.append("%s C%s::%s(%s) { return %s; }" % (
-                return_type, cls, name, args, zero_value(return_type)))
+            out.append("%s C%s::%s(%s)%s { return %s; }" % (
+                return_type, cls, name, args, tail, zero_value(return_type)))
     if stubbed:
         out.append("")
         out.append("// C%s: %d methods still stubbed - the no-ops above are not" % (cls, len(stubbed)))
@@ -390,7 +472,12 @@ def main():
         "",
         "// Self-contained: this file declares every class it emits, so it has",
         "// to bring the headers those classes are declared in with it.",
+        "#include <FileSystem.h>",
+        "#include <IBaseUI.h>",
         "#include <IClientVGUI.h>",
+        "#include <IGameConsole.h>",
+        "#include <IGameUI.h>",
+        "#include <IGameUIFuncs.h>",
         "#include <IEngineVGui.h>",
         "#include <vgui/ILocalize.h>",
         "#include <vgui/IInputInternal.h>",
@@ -419,10 +506,15 @@ def main():
     total = 0
 
     for cls in wanted:
-        path = "%s/vgui/%s.h" % (headers, cls)
-        try:
-            text = read(path)
-        except IOError:
+        stem = HEADER_FOR.get(cls, cls)
+        candidates = ["%s/vgui/%s.h" % (headers, stem),
+                      "%s/%s.h" % (headers, stem)]
+        text = None
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                text = read(candidate)
+                break
+        if text is None:
             print("skip %s (no header)" % cls, file=sys.stderr)
             continue
 
@@ -431,7 +523,8 @@ def main():
         methods = collect_with_overrides(text, cls, methods, hand)
         total += len(methods)
 
-        decls += emit_declarations(cls, methods, hand)
+        base = namespace_of(text, cls)
+        decls += emit_declarations(cls, methods, hand, base)
         bodies += emit_stubs(cls, methods, hand)
         decls.append("")
         bodies.append("")

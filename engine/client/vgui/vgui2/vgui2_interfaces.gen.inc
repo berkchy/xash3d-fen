@@ -9,7 +9,12 @@
 
 // Self-contained: this file declares every class it emits, so it has
 // to bring the headers those classes are declared in with it.
+#include <FileSystem.h>
+#include <IBaseUI.h>
 #include <IClientVGUI.h>
+#include <IGameConsole.h>
+#include <IGameUI.h>
+#include <IGameUIFuncs.h>
 #include <IEngineVGui.h>
 #include <vgui/ILocalize.h>
 #include <vgui/IInputInternal.h>
@@ -392,6 +397,274 @@ int CISurface::GetFontBlur(vgui2::HFont font) { return 0; }
 bool CISurface::IsAdditive(vgui2::HFont font) { return false; }
 
 // CISurface: 45 methods still stubbed - the no-ops above are not
+// finished features, they only keep the class concrete.
+
+
+HScheme CISchemeManager::LoadSchemeFromFile( const char *fileName, const char *tag ) { return (HScheme)0; }
+
+void CISchemeManager::ReloadSchemes() { }
+
+HScheme CISchemeManager::GetDefaultScheme() { return (HScheme)0; }
+
+HScheme CISchemeManager::GetScheme( const char *tag ) { return (HScheme)0; }
+
+IImage * CISchemeManager::GetImage( const char *imageName, bool hardwareFiltered ) { return NULL; }
+
+HTexture CISchemeManager::GetImageID( const char *imageName, bool hardwareFiltered ) { return (HTexture)0; }
+
+void CISchemeManager::DeleteImage( const char *pImageName ) { }
+
+IScheme * CISchemeManager::GetIScheme( HScheme scheme ) { return NULL; }
+
+void CISchemeManager::Shutdown( bool full ) { }
+
+int CISchemeManager::GetProportionalScaledValue( int normalizedValue ) { return 0; }
+
+int CISchemeManager::GetProportionalNormalizedValue( int scaledValue ) { return 0; }
+
+float CISchemeManager::GetProportionalScale() { return 0; }
+
+int CISchemeManager::GetHDProportionalScaledValue(int normalizedValue) { return 0; }
+
+int CISchemeManager::GetHDProportionalNormalizedValue(int scaledValue) { return 0; }
+
+// CISchemeManager: 14 methods still stubbed - the no-ops above are not
+// finished features, they only keep the class concrete.
+
+
+void CIGameUI::Initialize(CreateInterfaceFn *factories, int count) { }
+
+void CIGameUI::Start(cl_enginefunc_t *engineFuncs, int interfaceVersion, void *system) { }
+
+void CIGameUI::Shutdown(void) { }
+
+int CIGameUI::ActivateGameUI(void) { return 0; }
+
+int CIGameUI::ActivateDemoUI(void) { return 0; }
+
+int CIGameUI::HasExclusiveInput(void) { return 0; }
+
+void CIGameUI::RunFrame(void) { }
+
+void CIGameUI::ConnectToServer(const char *game, int IP, int port) { }
+
+void CIGameUI::DisconnectFromServer(void) { }
+
+void CIGameUI::HideGameUI(void) { }
+
+bool CIGameUI::IsGameUIActive(void) { return false; }
+
+void CIGameUI::LoadingStarted(const char *resourceType, const char *resourceName) { }
+
+void CIGameUI::LoadingFinished(const char *resourceType, const char *resourceName) { }
+
+void CIGameUI::StartProgressBar(const char *progressType, int progressSteps) { }
+
+int CIGameUI::ContinueProgressBar(int progressPoint, float progressFraction) { return 0; }
+
+void CIGameUI::StopProgressBar(bool bError, const char *failureReason, const char *extendedReason ) { }
+
+int CIGameUI::SetProgressBarStatusText(const char *statusText) { return 0; }
+
+void CIGameUI::SetSecondaryProgressBar(float progress) { }
+
+void CIGameUI::SetSecondaryProgressBarText(const char *statusText) { }
+
+void CIGameUI::ValidateCDKey(bool, bool) { }
+
+void CIGameUI::OnDisconnectFromServer(int eSteamLoginFailure, const char *username) { }
+
+void CIGameUI::SetIsRunningOnSteamDeck(bool bIsRunningOnDeck) { }
+
+bool CIGameUI::IsRunningOnSteamDeck() const { return false; }
+
+// CIGameUI: 23 methods still stubbed - the no-ops above are not
+// finished features, they only keep the class concrete.
+
+
+void CIGameConsole::Activate(void) { }
+
+void CIGameConsole::Initialize(void) { }
+
+void CIGameConsole::Hide(void) { }
+
+void CIGameConsole::Clear(void) { }
+
+bool CIGameConsole::IsConsoleVisible(void) { return false; }
+
+void CIGameConsole::Printf(const char *format, ...) { }
+
+void CIGameConsole::DPrintf(const char *format, ...) { }
+
+void CIGameConsole::SetParent(int parent) { }
+
+// CIGameConsole: 8 methods still stubbed - the no-ops above are not
+// finished features, they only keep the class concrete.
+
+
+bool CIGameUIFuncs::IsKeyDown( const char* pszKeyName, bool& bIsDown ) { return false; }
+
+const char* CIGameUIFuncs::Key_NameForKey( EngineKey iKeyNum ) { return NULL; }
+
+const char* CIGameUIFuncs::Key_BindingForKey( EngineKey iKeyNum ) { return NULL; }
+
+vgui2::KeyCode CIGameUIFuncs::GetVGUI2KeyCodeForBind( const char* pszBind ) { return (vgui2::KeyCode)0; }
+
+void CIGameUIFuncs::GetVideoModes( vmode_t** ppModes, int* piNumModes ) { }
+
+void CIGameUIFuncs::GetCurrentVideoMode( int* piWidth, int* piHeight, int* piBPP ) { }
+
+void CIGameUIFuncs::GetCurrentRenderer( char* pszName, int iNameLen, 
+									 int* piWindowed, int* piHDModels, 
+									 int* piAddonsFolder, int* piVidLevel ) { }
+
+bool CIGameUIFuncs::IsConnectedToVACSecureServer() { return false; }
+
+EngineKey CIGameUIFuncs::Key_KeyStringToKeyNum( const char* pszKeyName ) { return (EngineKey)0; }
+
+// CIGameUIFuncs: 9 methods still stubbed - the no-ops above are not
+// finished features, they only keep the class concrete.
+
+
+vgui2::VPANEL CIEngineVGui::GetPanel( VGuiPanel_t type ) { return (vgui2::VPANEL)0; }
+
+// CIEngineVGui: 1 methods still stubbed - the no-ops above are not
+// finished features, they only keep the class concrete.
+
+
+void CIBaseUI::Initialize( CreateInterfaceFn* pFactories, int iNumFactories ) { }
+
+void CIBaseUI::Start( cl_enginefunc_t* pEngfuncs, int iVersion ) { }
+
+void CIBaseUI::Shutdown() { }
+
+int CIBaseUI::Key_Event( int down, int keynum, const char* pszCurrentBinding ) { return 0; }
+
+void CIBaseUI::CallEngineSurfaceAppHandler( void* pEvent, void* pUserData ) { }
+
+void CIBaseUI::Paint( int x, int y, int right, int bottom ) { }
+
+void CIBaseUI::HideGameUI() { }
+
+void CIBaseUI::ActivateGameUI() { }
+
+void CIBaseUI::HideConsole() { }
+
+void CIBaseUI::ShowConsole() { }
+
+// CIBaseUI: 10 methods still stubbed - the no-ops above are not
+// finished features, they only keep the class concrete.
+
+
+void CIFileSystem::Mount(void) { }
+
+void CIFileSystem::Unmount(void) { }
+
+void CIFileSystem::RemoveAllSearchPaths( void ) { }
+
+void CIFileSystem::AddSearchPath( const char *pPath, const char *pathID ) { }
+
+bool CIFileSystem::RemoveSearchPath( const char *pPath ) { return false; }
+
+void CIFileSystem::RemoveFile( const char *pRelativePath, const char *pathID ) { }
+
+void CIFileSystem::CreateDirHierarchy( const char *path, const char *pathID ) { }
+
+bool CIFileSystem::FileExists( const char *pFileName ) { return false; }
+
+bool CIFileSystem::IsDirectory( const char *pFileName ) { return false; }
+
+FileHandle_t CIFileSystem::Open( const char *pFileName, const char *pOptions, const char *pathID ) { return (FileHandle_t)0; }
+
+void CIFileSystem::Close( FileHandle_t file ) { }
+
+void CIFileSystem::Seek( FileHandle_t file, int pos, FileSystemSeek_t seekType ) { }
+
+unsigned int CIFileSystem::Tell( FileHandle_t file ) { return 0; }
+
+unsigned int CIFileSystem::Size( FileHandle_t file ) { return 0; }
+
+unsigned int CIFileSystem::Size( const char *pFileName ) { return 0; }
+
+long CIFileSystem::GetFileTime( const char *pFileName ) { return 0; }
+
+void CIFileSystem::FileTimeToString( char* pStrip, int maxCharsIncludingTerminator, long fileTime ) { }
+
+bool CIFileSystem::IsOk( FileHandle_t file ) { return false; }
+
+void CIFileSystem::Flush( FileHandle_t file ) { }
+
+bool CIFileSystem::EndOfFile( FileHandle_t file ) { return false; }
+
+int CIFileSystem::Read( void* pOutput, int size, FileHandle_t file ) { return 0; }
+
+int CIFileSystem::Write( void const* pInput, int size, FileHandle_t file ) { return 0; }
+
+char			* CIFileSystem::ReadLine( char *pOutput, int maxChars, FileHandle_t file ) { return NULL; }
+
+int CIFileSystem::FPrintf( FileHandle_t file, char *pFormat, ... ) { return 0; }
+
+void			* CIFileSystem::GetReadBuffer( FileHandle_t file, int *outBufferSize, bool failIfNotInCache ) { return NULL; }
+
+void CIFileSystem::ReleaseReadBuffer( FileHandle_t file, void *readBuffer ) { }
+
+const char		* CIFileSystem::FindFirst( const char *pWildCard, FileFindHandle_t *pHandle, const char *pathID ) { return NULL; }
+
+const char		* CIFileSystem::FindNext( FileFindHandle_t handle ) { return NULL; }
+
+bool CIFileSystem::FindIsDirectory( FileFindHandle_t handle ) { return false; }
+
+void CIFileSystem::FindClose( FileFindHandle_t handle ) { }
+
+void CIFileSystem::GetLocalCopy( const char *pFileName ) { }
+
+const char		* CIFileSystem::GetLocalPath( const char *pFileName, char *pLocalPath, int localPathBufferSize ) { return NULL; }
+
+char			* CIFileSystem::ParseFile( char* pFileBytes, char* pToken, bool* pWasQuoted ) { return NULL; }
+
+bool CIFileSystem::FullPathToRelativePath( const char *pFullpath, char *pRelative ) { return false; }
+
+bool CIFileSystem::GetCurrentDirectory( char* pDirectory, int maxlen ) { return false; }
+
+void CIFileSystem::PrintOpenedFiles( void ) { }
+
+void CIFileSystem::SetWarningFunc( void (*pfnWarning)( const char *fmt, ... ) ) { }
+
+void CIFileSystem::SetWarningLevel( FileWarningLevel_t level ) { }
+
+void CIFileSystem::LogLevelLoadStarted( const char *name ) { }
+
+void CIFileSystem::LogLevelLoadFinished( const char *name ) { }
+
+int CIFileSystem::HintResourceNeed( const char *hintlist, int forgetEverything ) { return 0; }
+
+int CIFileSystem::PauseResourcePreloading( void ) { return 0; }
+
+int CIFileSystem::ResumeResourcePreloading( void ) { return 0; }
+
+int CIFileSystem::SetVBuf( FileHandle_t stream, char *buffer, int mode, long size ) { return 0; }
+
+void CIFileSystem::GetInterfaceVersion( char *p, int maxlen ) { }
+
+bool CIFileSystem::IsFileImmediatelyAvailable(const char *pFileName) { return false; }
+
+WaitForResourcesHandle_t CIFileSystem::WaitForResources( const char *resourcelist ) { return (WaitForResourcesHandle_t)0; }
+
+bool CIFileSystem::GetWaitForResourcesProgress( WaitForResourcesHandle_t handle, float *progress   , bool *complete   ) { return false; }
+
+void CIFileSystem::CancelWaitForResources( WaitForResourcesHandle_t handle ) { }
+
+bool CIFileSystem::IsAppReadyForOfflinePlay( int appID ) { return false; }
+
+bool CIFileSystem::AddPackFile( const char *fullpath, const char *pathID ) { return false; }
+
+FileHandle_t CIFileSystem::OpenFromCacheForRead( const char *pFileName, const char *pOptions, const char *pathID ) { return (FileHandle_t)0; }
+
+void CIFileSystem::AddSearchPathNoWrite( const char *pPath, const char *pathID ) { }
+
+long CIFileSystem::GetFileModificationTime(const char *pFileName) { return 0; }
+
+// CIFileSystem: 54 methods still stubbed - the no-ops above are not
 // finished features, they only keep the class concrete.
 
 } // namespace vgui2

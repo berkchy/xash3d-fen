@@ -17,13 +17,21 @@
 
 #include <IClientVGUI.h>
 #include <IEngineVGui.h>
+#include <FileSystem.h>
+#include <IBaseUI.h>
+#include <IGameConsole.h>
+#include <IGameUI.h>
+#include <IGameUIFuncs.h>
+#include <IEngineVGui.h>
 #include <vgui/IPanel.h>
+#include <vgui/IScheme.h>
 #include <vgui/ILocalize.h>
 #include <vgui/ISystem.h>
 #include <vgui/IVGui.h>
 #include <vgui/IInputInternal.h>
 
 #include "vgui2_panel.h"
+#include "vgui2_scheme.h"
 #include "vgui2_surface.h"
 
 #include "vgui2_interfaces.decl.inc"
@@ -38,6 +46,13 @@ extern "C" void *VGui2_GetPanelInterface( const char *name, int *code );
 
 namespace {
 
+vgui2::CIBaseUI       g_baseui;
+vgui2::CIGameUI       g_gameui;
+vgui2::CIGameConsole  g_console;
+vgui2::CIGameUIFuncs  g_gameuifuncs;
+vgui2::CIEngineVGui   g_enginevgui;
+vgui2::CIFileSystem   g_filesystem;
+vgui2::CISchemeManager g_scheme;
 vgui2::CVGui2PanelManager g_panels;
 vgui2::CIPanel    g_panel;
 vgui2::CISurface  g_surface;
@@ -54,6 +69,13 @@ struct Entry
 
 const Entry kInterfaces[] =
 {
+	{ FILESYSTEM_INTERFACE_VERSION,             &g_filesystem },
+	{ IBASEUI_NAME,                             &g_baseui },
+	{ VENGINE_VGUI_VERSION,                     &g_enginevgui },
+	{ IGAMEUIFUNCS_NAME,                        &g_gameuifuncs },
+	{ GAMECONSOLE_INTERFACE_VERSION_GS,         &g_console },
+	{ GAMEUI_INTERFACE_VERSION_GS,              &g_gameui },
+	{ VGUI_SCHEME_INTERFACE_VERSION_GS,         &g_scheme },
 	{ VGUI_PANEL_INTERFACE_VERSION_GS,          &g_panel },
 	{ VGUI_SURFACE_INTERFACE_VERSION_GS,        &g_surface },
 	{ VGUI_SYSTEM_INTERFACE_VERSION_GS,         &g_system },

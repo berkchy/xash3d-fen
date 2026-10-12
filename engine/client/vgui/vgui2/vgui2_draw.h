@@ -36,6 +36,10 @@ void VGUI2_FillRect( int x0, int y0, int x1, int y1, int r, int g, int b, int a 
 void VGUI2_DrawTexture( int texture, float x, float y, float w, float h,
 	float s1, float t1, float s2, float t2 );
 
+// Does the game have this file? The scheme manager asks before it records a
+// scheme, so a missing .res does not become an empty scheme.
+int VGUI2_FileExists( const char *path );
+
 // Texture by name, loaded on first use. Returns 0 when the file is missing,
 // which VGUI2 treats as "nothing to draw" rather than an error.
 int VGUI2_FindTexture( const char *name );

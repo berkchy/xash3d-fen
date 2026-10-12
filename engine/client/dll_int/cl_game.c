@@ -4301,6 +4301,11 @@ void VGUI2_DrawTexture( int texture, float x, float y, float w, float h,
 	ref.dllFuncs.R_DrawStretchPic( x, y, w, h, s1, t1, s2, t2, texture );
 }
 
+int VGUI2_FileExists( const char *path )
+{
+	return ( path && *path && FS_FileExists( path, true ) ) ? 1 : 0;
+}
+
 int VGUI2_FindTexture( const char *name )
 {
 	if( !name || !*name )

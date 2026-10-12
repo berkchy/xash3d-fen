@@ -9,7 +9,12 @@
 
 // Self-contained: this file declares every class it emits, so it has
 // to bring the headers those classes are declared in with it.
+#include <FileSystem.h>
+#include <IBaseUI.h>
 #include <IClientVGUI.h>
+#include <IGameConsole.h>
+#include <IGameUI.h>
+#include <IGameUIFuncs.h>
 #include <IEngineVGui.h>
 #include <vgui/ILocalize.h>
 #include <vgui/IInputInternal.h>
@@ -76,7 +81,7 @@ public:
 };
 
 
-class CIVGui : public vgui2::IVGui
+class CIVGui : public IVGui
 {
 public:
 	bool Init( CreateInterfaceFn *factoryList, int numFactories );
@@ -255,7 +260,7 @@ public:
 };
 
 
-class CISurface : public vgui2::ISurface
+class CISurface : public ISurface
 {
 public:
 	void Shutdown();
@@ -393,6 +398,196 @@ public:
 	int m_freeTextureCount;
 	VPANEL m_popups[vgui2::kMaxPopups];
 	int m_popupCount;
+
+	CreateInterfaceFn *m_factoryList = nullptr;
+	int m_numFactories = 0;
+};
+
+
+class CISchemeManager : public ISchemeManager
+{
+public:
+	HScheme LoadSchemeFromFile( const char *fileName, const char *tag );
+	void ReloadSchemes();
+	HScheme GetDefaultScheme();
+	HScheme GetScheme( const char *tag );
+	IImage * GetImage( const char *imageName, bool hardwareFiltered );
+	HTexture GetImageID( const char *imageName, bool hardwareFiltered );
+	void DeleteImage( const char *pImageName );
+	IScheme * GetIScheme( HScheme scheme );
+	void Shutdown( bool full );
+	int GetProportionalScaledValue( int normalizedValue );
+	int GetProportionalNormalizedValue( int scaledValue );
+	float GetProportionalScale();
+	int GetHDProportionalScaledValue(int normalizedValue);
+	int GetHDProportionalNormalizedValue(int scaledValue);
+
+	// Implementation-side members and helpers, from
+	// tools/gen_vgui2_interfaces.py EXTRA_MEMBERS.
+	CISchemeManager();
+	int m_proportionalBase[2];
+	int m_screenSize[2];
+
+	CreateInterfaceFn *m_factoryList = nullptr;
+	int m_numFactories = 0;
+};
+
+
+class CIGameUI : public IGameUI
+{
+public:
+	void Initialize(CreateInterfaceFn *factories, int count);
+	void Start(cl_enginefunc_t *engineFuncs, int interfaceVersion, void *system);
+	void Shutdown(void);
+	int ActivateGameUI(void);
+	int ActivateDemoUI(void);
+	int HasExclusiveInput(void);
+	void RunFrame(void);
+	void ConnectToServer(const char *game, int IP, int port);
+	void DisconnectFromServer(void);
+	void HideGameUI(void);
+	bool IsGameUIActive(void);
+	void LoadingStarted(const char *resourceType, const char *resourceName);
+	void LoadingFinished(const char *resourceType, const char *resourceName);
+	void StartProgressBar(const char *progressType, int progressSteps);
+	int ContinueProgressBar(int progressPoint, float progressFraction);
+	void StopProgressBar(bool bError, const char *failureReason, const char *extendedReason );
+	int SetProgressBarStatusText(const char *statusText);
+	void SetSecondaryProgressBar(float progress);
+	void SetSecondaryProgressBarText(const char *statusText);
+	void ValidateCDKey(bool, bool);
+	void OnDisconnectFromServer(int eSteamLoginFailure, const char *username);
+	void SetIsRunningOnSteamDeck(bool bIsRunningOnDeck);
+	bool IsRunningOnSteamDeck() const;
+
+	CreateInterfaceFn *m_factoryList = nullptr;
+	int m_numFactories = 0;
+};
+
+
+class CIGameConsole : public IGameConsole
+{
+public:
+	void Activate(void);
+	void Initialize(void);
+	void Hide(void);
+	void Clear(void);
+	bool IsConsoleVisible(void);
+	void Printf(const char *format, ...);
+	void DPrintf(const char *format, ...);
+	void SetParent(int parent);
+
+	CreateInterfaceFn *m_factoryList = nullptr;
+	int m_numFactories = 0;
+};
+
+
+class CIGameUIFuncs : public IGameUIFuncs
+{
+public:
+	bool IsKeyDown( const char* pszKeyName, bool& bIsDown );
+	const char* Key_NameForKey( EngineKey iKeyNum );
+	const char* Key_BindingForKey( EngineKey iKeyNum );
+	vgui2::KeyCode GetVGUI2KeyCodeForBind( const char* pszBind );
+	void GetVideoModes( vmode_t** ppModes, int* piNumModes );
+	void GetCurrentVideoMode( int* piWidth, int* piHeight, int* piBPP );
+	void GetCurrentRenderer( char* pszName, int iNameLen, 
+									 int* piWindowed, int* piHDModels, 
+									 int* piAddonsFolder, int* piVidLevel );
+	bool IsConnectedToVACSecureServer();
+	EngineKey Key_KeyStringToKeyNum( const char* pszKeyName );
+
+	CreateInterfaceFn *m_factoryList = nullptr;
+	int m_numFactories = 0;
+};
+
+
+class CIEngineVGui : public IEngineVGui
+{
+public:
+	vgui2::VPANEL GetPanel( VGuiPanel_t type );
+
+	CreateInterfaceFn *m_factoryList = nullptr;
+	int m_numFactories = 0;
+};
+
+
+class CIBaseUI : public IBaseUI
+{
+public:
+	void Initialize( CreateInterfaceFn* pFactories, int iNumFactories );
+	void Start( cl_enginefunc_t* pEngfuncs, int iVersion );
+	void Shutdown();
+	int Key_Event( int down, int keynum, const char* pszCurrentBinding );
+	void CallEngineSurfaceAppHandler( void* pEvent, void* pUserData );
+	void Paint( int x, int y, int right, int bottom );
+	void HideGameUI();
+	void ActivateGameUI();
+	void HideConsole();
+	void ShowConsole();
+
+	CreateInterfaceFn *m_factoryList = nullptr;
+	int m_numFactories = 0;
+};
+
+
+class CIFileSystem : public IFileSystem
+{
+public:
+	void Mount(void);
+	void Unmount(void);
+	void RemoveAllSearchPaths( void );
+	void AddSearchPath( const char *pPath, const char *pathID );
+	bool RemoveSearchPath( const char *pPath );
+	void RemoveFile( const char *pRelativePath, const char *pathID );
+	void CreateDirHierarchy( const char *path, const char *pathID );
+	bool FileExists( const char *pFileName );
+	bool IsDirectory( const char *pFileName );
+	FileHandle_t Open( const char *pFileName, const char *pOptions, const char *pathID );
+	void Close( FileHandle_t file );
+	void Seek( FileHandle_t file, int pos, FileSystemSeek_t seekType );
+	unsigned int Tell( FileHandle_t file );
+	unsigned int Size( FileHandle_t file );
+	unsigned int Size( const char *pFileName );
+	long GetFileTime( const char *pFileName );
+	void FileTimeToString( char* pStrip, int maxCharsIncludingTerminator, long fileTime );
+	bool IsOk( FileHandle_t file );
+	void Flush( FileHandle_t file );
+	bool EndOfFile( FileHandle_t file );
+	int Read( void* pOutput, int size, FileHandle_t file );
+	int Write( void const* pInput, int size, FileHandle_t file );
+	char			* ReadLine( char *pOutput, int maxChars, FileHandle_t file );
+	int FPrintf( FileHandle_t file, char *pFormat, ... );
+	void			* GetReadBuffer( FileHandle_t file, int *outBufferSize, bool failIfNotInCache );
+	void ReleaseReadBuffer( FileHandle_t file, void *readBuffer );
+	const char		* FindFirst( const char *pWildCard, FileFindHandle_t *pHandle, const char *pathID );
+	const char		* FindNext( FileFindHandle_t handle );
+	bool FindIsDirectory( FileFindHandle_t handle );
+	void FindClose( FileFindHandle_t handle );
+	void GetLocalCopy( const char *pFileName );
+	const char		* GetLocalPath( const char *pFileName, char *pLocalPath, int localPathBufferSize );
+	char			* ParseFile( char* pFileBytes, char* pToken, bool* pWasQuoted );
+	bool FullPathToRelativePath( const char *pFullpath, char *pRelative );
+	bool GetCurrentDirectory( char* pDirectory, int maxlen );
+	void PrintOpenedFiles( void );
+	void SetWarningFunc( void (*pfnWarning)( const char *fmt, ... ) );
+	void SetWarningLevel( FileWarningLevel_t level );
+	void LogLevelLoadStarted( const char *name );
+	void LogLevelLoadFinished( const char *name );
+	int HintResourceNeed( const char *hintlist, int forgetEverything );
+	int PauseResourcePreloading( void );
+	int ResumeResourcePreloading( void );
+	int SetVBuf( FileHandle_t stream, char *buffer, int mode, long size );
+	void GetInterfaceVersion( char *p, int maxlen );
+	bool IsFileImmediatelyAvailable(const char *pFileName);
+	WaitForResourcesHandle_t WaitForResources( const char *resourcelist );
+	bool GetWaitForResourcesProgress( WaitForResourcesHandle_t handle, float *progress   , bool *complete   );
+	void CancelWaitForResources( WaitForResourcesHandle_t handle );
+	bool IsAppReadyForOfflinePlay( int appID );
+	bool AddPackFile( const char *fullpath, const char *pathID );
+	FileHandle_t OpenFromCacheForRead( const char *pFileName, const char *pOptions, const char *pathID );
+	void AddSearchPathNoWrite( const char *pPath, const char *pathID );
+	long GetFileModificationTime(const char *pFileName);
 
 	CreateInterfaceFn *m_factoryList = nullptr;
 	int m_numFactories = 0;
