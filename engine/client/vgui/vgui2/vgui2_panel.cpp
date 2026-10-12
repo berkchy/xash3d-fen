@@ -327,11 +327,6 @@ void CIPanel::GetClipRect( VPANEL h, int &x0, int &y0, int &x1, int &y1 )
 	clip_rect( panel( h ), &x0, &y0, &x1, &y1 );
 }
 
-void CIPanel::Solve( VPANEL h )
-{
-	if ( Entry *entry = panel( h ) )
-		entry->layoutEnabled = true;
-}
 
 // --- Tree ------------------------------------------------------------------
 
