@@ -15,11 +15,17 @@
 // without a link error.
 #include "vgui2_factory.h"
 
+#include <IClientVGUI.h>
+#include <IEngineVGui.h>
+#include <vgui/IPanel.h>
 #include <vgui/ILocalize.h>
 #include <vgui/ISystem.h>
 #include <vgui/IVGui.h>
 #include <vgui/IInputInternal.h>
 
+#include "vgui2_panel.h"
+
+#include "vgui2_interfaces.decl.inc"
 #include "vgui2_interfaces.gen.inc"
 
 // Surface and panel: implemented in vgui2_surface.cpp and vgui2_panel.cpp.
@@ -31,6 +37,8 @@ extern "C" void *VGui2_GetPanelInterface( const char *name, int *code );
 
 namespace {
 
+vgui2::CVGui2PanelManager g_panels;
+vgui2::CIPanel    g_panel;
 vgui2::CISystem  g_system;
 vgui2::CIVGui     g_vgui;
 vgui2::CIInputInternal g_input;
@@ -44,6 +52,7 @@ struct Entry
 
 const Entry kInterfaces[] =
 {
+	{ VGUI_PANEL_INTERFACE_VERSION_GS,          &g_panel },
 	{ VGUI_SYSTEM_INTERFACE_VERSION_GS,         &g_system },
 	{ VGUI_IVGUI_INTERFACE_VERSION_GS,          &g_vgui },
 	{ VGUI_INPUTINTERNAL_INTERFACE_VERSION,     &g_input },

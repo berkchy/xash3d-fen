@@ -27,7 +27,33 @@ DEFAULT_CLASSES = [
     ("IVGui", "IVGui"),
     ("IInputInternal", "IInputInternal"),
     ("ILocalize", "ILocalize"),
+    ("IPanel", "IPanel"),
 ]
+
+# Methods with a real body in another file. The generator emits their
+# declaration and no stub, so a method here is a promise the hand-written
+# file keeps; anything missing from this set gets a stub instead, which is
+# how the tree in vgui2_panel.cpp and the rest stay in step.
+IMPLEMENTED = {
+    "CIPanel": {
+        "Init", "SetPos", "GetPos", "GetAbsPos", "SetSize", "GetSize",
+        "SetMinimumSize", "GetMinimumSize", "OnSizeChanged", "SetInset",
+        "GetInset", "GetClipRect", "SetParent", "GetParent", "GetChildCount",
+        "GetChild", "OnChildAdded", "DeletePanel", "SetVisible", "IsVisible",
+        "IsFullyVisible", "SetZPos", "GetZPos", "SetRenderZPos",
+        "GetRenderZPos", "MoveToFront", "MoveToBack", "HasParent", "IsPopup",
+        "SetPopup", "Render_GetPopupVisible", "Render_SetPopupVisible",
+        "IsEnabled", "SetEnabled", "SetAutoDelete", "IsAutoDeleteSet",
+        "SetKeyBoardInputEnabled", "IsKeyBoardInputEnabled",
+        "SetMouseInputEnabled", "IsMouseInputEnabled", "SetProportional",
+        "IsProportional", "Plat", "SetPlat", "Client", "GetName",
+        "GetClassName", "GetModuleName", "GetPanel", "PaintTraverse",
+        "IsWithinTraverse", "Repaint", "PerformApplySchemeSettings",
+        "GetScheme", "SendMessage", "Think", "RequestInfo",
+        "InternalFocusChanged", "RequestFocus", "RequestFocusPrev",
+        "RequestFocusNext", "GetCurrentKeyFocus", "GetTabPosition",
+    },
+}
 
 
 def read(path):
@@ -100,6 +126,32 @@ def bases(text, name):
     return [base]
 
 
+# Declared in the base with a body, but the base body is wrong for us: the
+# stock IsFullyVisible answers from the visible flag alone and ignores the
+# clip rectangle. Declared in the generated class so the hand-written file
+# can override them.
+EXTRA_OVERRIDES = {
+    # IsFullyVisible, SetAutoDelete, SetRenderZPos and friends are commented
+    # out in Valve's GoldSource IPanel - the GS build disabled them - so they
+    # are not part of the interface and overriding them would only produce
+    # methods nothing calls. Only what the header really declares goes here.
+    "CIPanel": {
+        "GetTabPosition",
+    },
+}
+
+
+def extra_signature(text, name, method):
+    """Find the base declaration of a non-pure virtual so it can be mirrored."""
+    body = strip_comments(text)
+    for match in re.finditer(r"virtual\s+(.*?)\s*(?:=\s*0)?\s*;", body, re.S):
+        sig = re.sub(r"\s+", " ", match.group(1)).strip()
+        parsed = parse(sig)
+        if parsed[1] == method:
+            return parsed
+    return None
+
+
 def virtuals(text, name, seen=None):
     """Pure virtuals of `name` and of everything it inherits from.
 
@@ -121,7 +173,9 @@ def virtuals(text, name, seen=None):
 
     for base in bases(text, name):
         for candidate in ("%s/vgui/%s.h" % (HEADERS[0], base),
-                          "%s/%s.h" % (HEADERS[0], base)):
+                          "%s/%s.h" % (HEADERS[0], base),
+                          "%s/vgui_controls/%s.h" % (HEADERS[0], base),
+                          "%s/tier1/%s.h" % (HEADERS[0], base)):
             if os.path.exists(candidate):
                 found += virtuals(read(candidate), base, seen)
                 break
@@ -149,31 +203,127 @@ def zero_value(return_type):
     return "(%s)0" % bare
 
 
+def collect_with_overrides(text, cls, methods, hand):
+    """Add the non-pure virtuals the hand-written file wants to override."""
+    extra = EXTRA_OVERRIDES.get("C%s" % cls, set())
+    if not extra:
+        return methods
+
+    known = {name for _, name, _ in methods}
+    result = list(methods)
+    for method in sorted(extra):
+        if method in known:
+            continue
+        signature = extra_signature(text, cls, method)
+        if signature:
+            result.append(signature)
+    return result
+
+
+def emit_declarations(cls, methods, hand):
+    """Class declaration only. Safe to include from many translation units."""
+    out = ["class C%s : public vgui2::%s" % (cls, cls), "{", "public:"]
+
+    init = [m for m in methods if m[1] == "Init"]
+    body_methods = [m for m in methods if m[1] != "Init"]
+    if init:
+        ret, _, args = init[0]
+        out.append("\t%s Init(%s);" % (ret, args))
+    # Shutdown is declared by the header like every other method; writing it
+    # out here as well is a redeclaration, not a default.
+
+    for return_type, name, args in body_methods:
+        out.append("\t%s %s(%s);" % (return_type, name, args))
+
+    out.append("")
+    out.append("\tCreateInterfaceFn *m_factoryList = nullptr;")
+    out.append("\tint m_numFactories = 0;")
+    out.append("};")
+    out.append("")
+
+    # Only the tier1-style Init(CreateInterfaceFn*, int) gets a body here.
+    # IPanel::Init(VPANEL, IClientPanel*) is a different thing and is
+    # implemented by hand in vgui2_panel.cpp.
+    init = [m for m in init if "CreateInterfaceFn" in m[2]]
+    if init:
+        ret, _, args = init[0]
+        out.append("%s C%s::Init(%s)" % (ret, cls, args))
+        out.append("{")
+        out.append("\tm_factoryList = factoryList;")
+        out.append("\tm_numFactories = numFactories;")
+        if ret != "void":
+            out.append("\treturn %s;" % zero_value(ret))
+        out.append("}")
+        out.append("")
+
+    # No definitions here. A hand-implemented method is declared and then
+    # defined in the file that implements it - defining it here as well
+    # would put the same symbol in two translation units.
+    return out
+
+
+def emit_stubs(cls, methods, hand):
+    """Definitions for everything nobody wrote by hand.
+
+    These exist so the class is concrete and the client library can start;
+    each one is a no-op and the header comment says which ones they are, so a
+    stub is never mistaken for a finished feature.
+    """
+    out = []
+    stubbed = [m for m in methods if m[1] not in hand and m[1] != "Init"]
+    for return_type, name, args in stubbed:
+        out.append("")
+        if return_type == "void":
+            out.append("void C%s::%s(%s) { }" % (cls, name, args))
+        else:
+            out.append("%s C%s::%s(%s) { return %s; }" % (
+                return_type, cls, name, args, zero_value(return_type)))
+    if stubbed:
+        out.append("")
+        out.append("// C%s: %d methods still stubbed - the no-ops above are not" % (cls, len(stubbed)))
+        out.append("// finished features, they only keep the class concrete.")
+    return out
+
+
 def main():
     headers = sys.argv[1]
     HEADERS[0] = headers
     output = sys.argv[2]
+    decl_output = output.replace(".gen.inc", ".decl.inc")
     wanted = sys.argv[3:] or [name for name, _ in DEFAULT_CLASSES]
 
-    lines = [
+    banner = [
         "// Generated by tools/gen_vgui2_interfaces.py - do not edit.",
         "// Regenerate after any header change under headers/vgui.",
         "",
-        "// Included, not compiled on its own: the file has no includes of",
-        "// its own, and engine/wscript globs *.cpp in this directory, so a",
-        "// .cpp here would be built as a translation unit that sees nothing.",
-        "// NULL below needs a definition on some toolchains even after the",
-        "// Valve headers are in.",
+        "// Declarations and definitions are emitted separately so that a file",
+        "// which implements some of these methods by hand can include the",
+        "// declarations without also pulling in the stubs: two translation",
+        "// units defining the same method is what LNK4006 was.",
         "#include <stddef.h>",
         "",
-        "// Inside the namespace so the headers' unqualified types (KeyCode,",
-        "// StringIndex_t) resolve exactly as they do in the client library.",
+        "// Self-contained: this file declares every class it emits, so it has",
+        "// to bring the headers those classes are declared in with it.",
+        "#include <IClientVGUI.h>",
+        "#include <IEngineVGui.h>",
+        "#include <vgui/ILocalize.h>",
+        "#include <vgui/IInputInternal.h>",
+        "#include <vgui/IPanel.h>",
+        "#include <vgui/IScheme.h>",
+        "#include <vgui/ISurface.h>",
+        "#include <vgui/ISystem.h>",
+        "#include <vgui/IVGui.h>",
+        "#include <vgui_controls/Panel.h>",
+        "",
         "namespace vgui2",
         "{",
         "",
     ]
 
+    decls = list(banner)
+    bodies = list(banner)
     total = 0
+
     for cls in wanted:
         path = "%s/vgui/%s.h" % (headers, cls)
         try:
@@ -181,56 +331,27 @@ def main():
         except IOError:
             print("skip %s (no header)" % cls, file=sys.stderr)
             continue
+
         methods = virtuals(text, cls)
+        hand = IMPLEMENTED.get("C%s" % cls, set())
+        methods = collect_with_overrides(text, cls, methods, hand)
         total += len(methods)
-        lines.append("class C%s : public vgui2::%s" % (cls, cls))
-        lines.append("{")
-        lines.append("public:")
-        init = [m for m in methods if m[1] == "Init"]
-        if init:
-            ret, _, args = init[0]
-            lines.append("\t%s Init(%s);" % (ret, args))
-            # declaration only: the body is emitted below with the rest of
-            # the out-of-line definitions, or the class body and the
-            # definition would both claim the name
-            methods = [m for m in methods if m[1] != "Init"]
-        lines.append("")
-        for return_type, name, args in methods:
-            if return_type == "void":
-                lines.append("\t%s %s(%s);" % (return_type, name, args))
-            else:
-                lines.append("\t%s %s(%s);" % (return_type, name, args))
-        lines.append("")
-        lines.append("\tCreateInterfaceFn *m_factoryList = nullptr;")
-        lines.append("\tint m_numFactories = 0;")
-        lines.append("};")
-        lines.append("")
-        if init:
-            ret, _, args = init[0]
-            lines.append("%s C%s::Init(%s)" % (ret, cls, args))
-            lines.append("{")
-            lines.append("\tm_factoryList = factoryList;")
-            lines.append("\tm_numFactories = numFactories;")
-            if ret != "void":
-                lines.append("\treturn %s;" % zero_value(ret))
-            lines.append("}")
-            lines.append("")
-        for return_type, name, args in methods:
-            lines.append("")
-            if return_type == "void":
-                lines.append("void C%s::%s(%s) { }" % (cls, name, args))
-            else:
-                lines.append("%s C%s::%s(%s) { return %s; }" % (
-                    return_type, cls, name, args, zero_value(return_type)))
-        lines.append("")
-        lines.append("// ---")
 
-    lines.append("} // namespace vgui2")
-    lines.append("")
+        decls += emit_declarations(cls, methods, hand)
+        bodies += emit_stubs(cls, methods, hand)
+        decls.append("")
+        bodies.append("")
 
+    decls.append("} // namespace vgui2")
+    decls.append("")
+    bodies.append("} // namespace vgui2")
+    bodies.append("")
+
+    with open(decl_output, "w") as handle:
+        handle.write("\n".join(decls) + "\n")
     with open(output, "w") as handle:
-        handle.write("\n".join(lines) + "\n")
-    print("wrote %s: %d methods" % (output, total))
+        handle.write("\n".join(bodies) + "\n")
+    print("wrote %s and %s: %d methods" % (output, decl_output, total))
 
 
 if __name__ == "__main__":
