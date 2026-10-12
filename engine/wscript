@@ -189,6 +189,22 @@ def build(bld):
 	libs = ['engine_includes', 'public', 'werror', 'backtrace_custom', 'library_suffix', 'build_vcs']
 	includes = ['server', 'client', 'client/vgui', 'common/soundlib', 'platform']
 
+	# Engine half of GoldSource VGUI2. Built apart from the client because
+	# headers/ is Valve's include tree: netadr.h there collides with the
+	# engine's own netadr.h, and on the client target the C sources would
+	# pick Valve's up instead. C++ only, so it links the C++ runtime.
+	vgui2_lib = None
+	if not bld.env.DEDICATED:
+		vgui2_includes = ['.', 'headers', 'headers/tier0', 'headers/tier1',
+			'headers/tier2', 'headers/common', 'headers/mathlib']
+		vgui2_lib = bld.stlib(
+			source   = bld.path.ant_glob('client/vgui/vgui2/*.cpp'),
+			target   = 'vgui2',
+			includes = vgui2_includes,
+			features = 'c cxx',
+			use      = 'engine_includes',
+		)
+
 	# basic build: dedicated only
 	source = bld.path.ant_glob(['common/*.c', 'common/imagelib/*.c', 'common/soundlib/*.c', 'server/*.c'])
 
@@ -294,11 +310,13 @@ def build(bld):
 			# Sys_GetNativeObject("VGui2Factory") and every one of them is
 			# NULL without this, so its panel code can never start. Kept in
 			# one directory so the C sources above stay C.
-			source += bld.path.ant_glob('client/vgui/vgui2/*.cpp')
-			includes += ['client/vgui/vgui2', 'client/vgui/vgui2/headers',
-				'client/vgui/vgui2/headers/tier0', 'client/vgui/vgui2/headers/tier1',
-				'client/vgui/vgui2/headers/tier2', 'client/vgui/vgui2/headers/common',
-				'client/vgui/vgui2/headers/mathlib']
+			# Not built in place: engine/client/vgui/vgui2/headers is Valve's
+			# include tree and netadr.h in it collides with the engine's own,
+			# so putting those paths on the client target would repoint every
+			# C source at Valve's headers. Separate static library, its own
+			# include path, linked in below.
+			if vgui2_lib:
+				libs.append(vgui2_lib)
 			libs += ['bzip2', 'MultiEmulator', 'opus', 'opusfile', 'vorbis', 'vorbisfile']
 
 		# Android port is linked differently
