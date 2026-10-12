@@ -1,8 +1,9 @@
 // vgui2_font.cpp - VGUI2 font names resolved against the engine's fonts.
 #include "vgui2_font.h"
 
-#include "client.h"
-
+// No engine headers here. This file turns a scheme's font name into one of
+// the engine's three console font slots and nothing more; the drawing that
+// actually uses the slot is in vgui2_draw.c, which does include client.h.
 #include <string.h>
 
 namespace vgui2 {
