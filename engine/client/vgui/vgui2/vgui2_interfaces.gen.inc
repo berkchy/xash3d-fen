@@ -400,11 +400,6 @@ bool CISurface::IsAdditive(vgui2::HFont font) { return false; }
 // finished features, they only keep the class concrete.
 
 
-void CISchemeManager::Shutdown( bool full ) { }
-
-// CISchemeManager: 1 methods still stubbed - the no-ops above are not
-// finished features, they only keep the class concrete.
-
 
 void CIGameUI::Initialize(CreateInterfaceFn *factories, int count) { }
 

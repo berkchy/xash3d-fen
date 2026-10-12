@@ -96,7 +96,7 @@ IMPLEMENTED = {
     "CISchemeManager": {
         "LoadSchemeFromFile", "ReloadSchemes", "GetDefaultScheme",
         "GetScheme", "GetIScheme", "GetImage", "GetImageID",
-        "DeleteImage", "GetProportionalScaledValue",
+        "DeleteImage", "Shutdown", "GetProportionalScaledValue",
         "GetProportionalNormalizedValue", "GetProportionalScale",
         "GetHDProportionalScaledValue", "GetHDProportionalNormalizedValue",
     },
