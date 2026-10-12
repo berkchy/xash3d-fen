@@ -1132,6 +1132,17 @@ int Con_UtfMoveRight( char *str, int pos, int length );
 void Con_DefaultColor( int r, int g, int b, qboolean gameui );
 cl_font_t *Con_GetCurFont( void );
 cl_font_t *Con_GetFont( int num );
+
+// Drawing bridge for the engine-side VGUI2 in client/vgui/vgui2, which is
+// C++ and cannot include client.h. Implemented in dll_int/cl_game.c.
+void VGUI2_Enter2D( void );
+void VGUI2_FillRect( int x0, int y0, int x1, int y1, int r, int g, int b, int a );
+void VGUI2_DrawTexture( int texture, float x, float y, float w, float h,
+	float s1, float t1, float s2, float t2 );
+int VGUI2_FindTexture( const char *name );
+void VGUI2_TextureSize( int texture, int *width, int *height );
+int VGUI2_DrawText( int slot, float x, float y, const char *text, int r, int g, int b, int a );
+void VGUI2_TextSize( int slot, const char *text, int *width, int *height );
 int Con_DrawString( int x, int y, const char *string, const rgba_t setColor ); // legacy, use cl_font.c
 void GAME_EXPORT Con_DrawStringLen( const char *pText, int *length, int *height ); // legacy, use cl_font.c
 void Con_CharEvent( int key );
