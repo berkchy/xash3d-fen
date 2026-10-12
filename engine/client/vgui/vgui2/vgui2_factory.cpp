@@ -15,7 +15,7 @@
 #include <vgui/IVGui.h>
 #include <vgui/IInputInternal.h>
 
-#include "vgui2_interfaces.gen.cpp"
+#include "vgui2_interfaces.gen.inc"
 
 // Surface and panel: implemented in vgui2_surface.cpp and vgui2_panel.cpp.
 // Declared here so the factory can hand them out once they exist; until then

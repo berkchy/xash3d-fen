@@ -10,4 +10,4 @@
 #include <vgui/ISurface.h>
 #include <vgui/IPanel.h>
 
-#include "vgui2_interfaces.gen.cpp"
+#include "vgui2_interfaces.gen.inc"
