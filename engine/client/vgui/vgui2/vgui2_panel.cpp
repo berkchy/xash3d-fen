@@ -19,8 +19,8 @@
 
 #include "vgui2_interfaces.decl.inc"
 
-#include <algorithm>
 #include <stdint.h>
+#include <string.h>
 
 namespace vgui2 {
 
@@ -34,11 +34,15 @@ CVGui2PanelManager *CVGui2PanelManager::s_instance = nullptr;
 CVGui2PanelManager::CVGui2PanelManager()
 {
 	s_instance = this;
-	m_free.clear();
+	m_entries = new Entry[kCapacity];
+	m_capacity = kCapacity;
 }
 
 CVGui2PanelManager::~CVGui2PanelManager()
 {
+	delete [] m_entries;
+	m_entries = nullptr;
+
 	if ( s_instance == this )
 		s_instance = nullptr;
 }
@@ -50,39 +54,47 @@ CVGui2PanelManager *CVGui2PanelManager::Instance()
 
 CVGui2PanelManager::Entry *CVGui2PanelManager::Get( VPANEL handle )
 {
-	if ( !handle || handle > m_entries.size() )
+	if ( !handle || handle > (VPANEL)m_count * kHandleStep )
 		return nullptr;
 
-	Entry &entry = m_entries[handle - 1];
-	if ( !entry.alive || entry.generation != (handle >> 16) )
+	// The generation lives in the high half. A freed index gets a new one
+	// when it is handed out again, so a handle the client library kept past
+	// DeletePanel fails to resolve instead of addressing its replacement.
+	unsigned short index = handle & 0xffff;
+	unsigned short generation = (unsigned short)(handle >> 16);
+	if ( !index || index > m_count )
 		return nullptr;
+
+	Entry &entry = m_entries[index - 1];
+	if ( !entry.alive || entry.generation != generation )
+		return nullptr;
+
 	return &entry;
 }
 
-// Reuses a freed slot when there is one. The generation is bumped either way
-// so an old handle held by the client library cannot resolve to the panel
-// that inherits the index.
 VPANEL CVGui2PanelManager::Allocate()
 {
 	VPANEL handle;
 
-	if ( !m_free.empty() )
+	if ( m_freeCount > 0 )
 	{
-		handle = m_free.back();
-		m_free.pop_back();
+		handle = m_free[--m_freeCount];
 	}
 	else
 	{
-		m_entries.push_back( Entry() );
-		handle = (VPANEL)m_entries.size() << 16;
+		if ( m_count >= m_capacity )
+			return 0;
+
+		m_count++;
+		handle = (VPANEL)m_count * kHandleStep;
 	}
 
-	Entry &entry = m_entries[(handle & 0xffff) - 1];
+	unsigned short index = (unsigned short)(handle & 0xffff);
+	Entry &entry = m_entries[index - 1];
+
 	entry.generation++;
-	handle = (entry.generation << 16) | ((handle & 0xffff));
+	handle = ((VPANEL)entry.generation << 16) | (VPANEL)index;
 	entry.alive = true;
-	entry.parent = 0;
-	entry.children.clear();
 	return handle;
 }
 
@@ -92,25 +104,33 @@ void CVGui2PanelManager::Free( VPANEL handle )
 	if ( !entry )
 		return;
 
-	// Detach from the parent first: the client library deletes panels from
+	// Detach from the parent first. The client library deletes panels from
 	// the inside out, and a child still listed in a dead parent would make
-	// the next GetChild walk read freed memory.
+	// the next GetChild walk read a slot that is about to be reused.
 	VPANEL parent = entry->parent;
 	if ( Entry *parentEntry = Get( parent ) )
 	{
-		auto it = std::find( parentEntry->children.begin(), parentEntry->children.end(), handle );
-		if ( it != parentEntry->children.end() )
-			parentEntry->children.erase( it );
+		for ( int i = 0; i < parentEntry->childCount; i++ )
+		{
+			if ( parentEntry->children[i] != handle )
+				continue;
+
+			for ( int j = i; j < parentEntry->childCount - 1; j++ )
+				parentEntry->children[j] = parentEntry->children[j + 1];
+			parentEntry->childCount--;
+			break;
+		}
 	}
 
 	entry->alive = false;
 	entry->parent = 0;
-	entry->children.clear();
+	entry->childCount = 0;
 	entry->client = nullptr;
 	entry->panel = nullptr;
-	m_free.push_back( handle );
-}
 
+	if ( m_freeCount < (int)(sizeof( m_free ) / sizeof( m_free[0] )) )
+		m_free[m_freeCount++] = handle;
+}
 
 // ---------------------------------------------------------------------------
 // CIPanel - the interface the client library actually calls.
@@ -124,6 +144,12 @@ void CVGui2PanelManager::Free( VPANEL handle )
 using Entry = CVGui2PanelManager::Entry;
 
 namespace {
+
+// Append to a panel's child list, order preserved. A panel that will not
+// take another child is skipped rather than reallocated: the list is what
+// paint order is built from, and growing it at paint time is not an option.
+void AddChild( Entry *entry, VPANEL child );
+void RemoveChild( Entry *entry, VPANEL child );
 
 Entry *panel( VPANEL handle )
 {
@@ -187,10 +213,10 @@ bool clip_rect( Entry *entry, int *x0, int *y0, int *x1, int *y1 )
 
 			int px, py;
 			abs_pos( parent, &px, &py );
-			left = std::max( left, px + parent->inset[0] );
-			top = std::max( top, py + parent->inset[1] );
-			right = std::min( right, px + parent->wide - parent->inset[2] );
-			bottom = std::min( bottom, py + parent->tall - parent->inset[3] );
+			if ( px + parent->inset[0] > left ) left = px + parent->inset[0];
+			if ( py + parent->inset[1] > top ) top = py + parent->inset[1];
+			if ( px + parent->wide - parent->inset[2] < right ) right = px + parent->wide - parent->inset[2];
+			if ( py + parent->tall - parent->inset[3] < bottom ) bottom = py + parent->tall - parent->inset[3];
 
 			current = parent;
 		}
@@ -204,6 +230,35 @@ bool clip_rect( Entry *entry, int *x0, int *y0, int *x1, int *y1 )
 	if ( y1 ) *y1 = bottom;
 
 	return left < right && top < bottom;
+}
+
+
+// Append to a panel's child list, order preserved. A panel that will not
+// take another child is skipped rather than reallocated: the list is what
+// paint order is built from, and growing it at paint time is not an option.
+void AddChild( Entry *entry, VPANEL child )
+{
+	if ( !entry || entry->childCount >= kMaxChildren )
+		return;
+
+	entry->children[entry->childCount++] = child;
+}
+
+void RemoveChild( Entry *entry, VPANEL child )
+{
+	if ( !entry )
+		return;
+
+	for ( int i = 0; i < entry->childCount; i++ )
+	{
+		if ( entry->children[i] != child )
+			continue;
+
+		for ( int j = i; j < entry->childCount - 1; j++ )
+			entry->children[j] = entry->children[j + 1];
+		entry->childCount--;
+		return;
+	}
 }
 
 } // namespace
@@ -242,8 +297,8 @@ void CIPanel::SetSize( VPANEL h, int wide, int tall )
 
 	// A minimum size set by a scheme wins over the caller, which is how
 	// controls keep their art intact when a window tries to shrink them.
-	wide = std::max( wide, entry->minWide );
-	tall = std::max( tall, entry->minTall );
+	if ( entry->minWide > wide ) wide = entry->minWide;
+	if ( entry->minTall > tall ) tall = entry->minTall;
 
 	if ( wide == entry->wide && tall == entry->tall )
 		return;
@@ -291,8 +346,8 @@ void CIPanel::OnSizeChanged( VPANEL h, int wide, int tall )
 	// Children are positioned by their parent, so a resize has to reach the
 	// whole subtree. One level is not enough: a label inside a frame inside
 	// a dialog has to move too.
-	for ( VPANEL child : entry->children )
-		OnSizeChanged( child, wide, tall );
+	for ( int i = 0; i < entry->childCount; i++ )
+		OnSizeChanged( entry->children[i], wide, tall );
 }
 
 void CIPanel::SetInset( VPANEL h, int left, int top, int right, int bottom )
@@ -354,11 +409,7 @@ void CIPanel::SetParent( VPANEL h, VPANEL newParent )
 	if ( entry->parent )
 	{
 		if ( Entry *old = panel( entry->parent ) )
-		{
-			auto it = std::find( old->children.begin(), old->children.end(), h );
-			if ( it != old->children.end() )
-				old->children.erase( it );
-		}
+			RemoveChild( old, h );
 	}
 
 	entry->parent = newParent;
@@ -367,7 +418,7 @@ void CIPanel::SetParent( VPANEL h, VPANEL newParent )
 	{
 		if ( Entry *parent = panel( newParent ) )
 		{
-			parent->children.push_back( h );
+			AddChild( parent, h );
 			OnChildAdded( newParent, h );
 		}
 	}
@@ -382,13 +433,13 @@ VPANEL CIPanel::GetParent( VPANEL h )
 int CIPanel::GetChildCount( VPANEL h )
 {
 	Entry *entry = panel( h );
-	return entry ? (int)entry->children.size() : 0;
+	return entry ? entry->childCount : 0;
 }
 
 VPANEL CIPanel::GetChild( VPANEL h, int index )
 {
 	Entry *entry = panel( h );
-	if ( !entry || index < 0 || index >= (int)entry->children.size() )
+	if ( !entry || index < 0 || index >= entry->childCount )
 		return 0;
 	return entry->children[index];
 }
@@ -407,16 +458,18 @@ void CIPanel::DeletePanel( VPANEL h )
 		return;
 
 	// Depth first: a child must be gone before the parent that lists it.
-	std::vector<VPANEL> stack{ h };
-	while ( !stack.empty() )
+	VPANEL stack[kMaxChildren * 2];
+	int top = 0;
+	stack[top++] = h;
+
+	while ( top > 0 )
 	{
-		VPANEL current = stack.back();
-		stack.pop_back();
+		VPANEL current = stack[--top];
 
 		if ( Entry *entry = manager->Get( current ) )
 		{
-			for ( VPANEL child : entry->children )
-				stack.push_back( child );
+			for ( int i = entry->childCount - 1; i >= 0 && top < (int)( sizeof( stack ) / sizeof( stack[0] )); i-- )
+				stack[top++] = entry->children[i];
 		}
 
 		manager->Free( current );
@@ -464,10 +517,8 @@ void CIPanel::MoveToFront( VPANEL h )
 	if ( !parent )
 		return;
 
-	auto it = std::find( parent->children.begin(), parent->children.end(), h );
-	if ( it != parent->children.end() )
-		parent->children.erase( it );
-	parent->children.push_back( h );
+	RemoveChild( parent, h );
+	AddChild( parent, h );
 }
 
 void CIPanel::MoveToBack( VPANEL h )
@@ -480,10 +531,13 @@ void CIPanel::MoveToBack( VPANEL h )
 	if ( !parent )
 		return;
 
-	auto it = std::find( parent->children.begin(), parent->children.end(), h );
-	if ( it != parent->children.end() )
-		parent->children.erase( it );
-	parent->children.insert( parent->children.begin(), h );
+	RemoveChild( parent, h );
+
+	// To the front of the paint order means first in the list.
+	for ( int i = parent->childCount; i > 0; i-- )
+		parent->children[i] = parent->children[i - 1];
+	parent->children[0] = h;
+	parent->childCount++;
 }
 
 bool CIPanel::HasParent( VPANEL h, VPANEL potentialParent )
@@ -560,19 +614,19 @@ IClientPanel *CIPanel::Client( VPANEL h )
 const char *CIPanel::GetName( VPANEL h )
 {
 	Entry *entry = panel( h );
-	return entry ? entry->name.c_str() : "";
+	return entry ? entry->name : "";
 }
 
 const char *CIPanel::GetClassName( VPANEL h )
 {
 	Entry *entry = panel( h );
-	return entry ? entry->className.c_str() : "";
+	return entry ? entry->className : "";
 }
 
 const char *CIPanel::GetModuleName( VPANEL h )
 {
 	Entry *entry = panel( h );
-	return entry ? entry->moduleName.c_str() : "";
+	return entry ? entry->moduleName : "";
 }
 
 // --- Identity --------------------------------------------------------------
@@ -608,8 +662,8 @@ void CIPanel::PaintTraverse( VPANEL h, bool forceRepaint, bool allowForce )
 	// Children last, in list order: MoveToFront and MoveToBack edit this
 	// same list, so paint order follows the order the client library asked
 	// for without a second structure to keep in step.
-	for ( VPANEL child : entry->children )
-		PaintTraverse( child, forceRepaint, allowForce );
+	for ( int i = 0; i < entry->childCount; i++ )
+		PaintTraverse( entry->children[i], forceRepaint, allowForce );
 }
 
 VPANEL CIPanel::IsWithinTraverse( VPANEL h, int x, int y, bool traversePopups )
@@ -632,7 +686,7 @@ VPANEL CIPanel::IsWithinTraverse( VPANEL h, int x, int y, bool traversePopups )
 
 	// Back to front: the last child painted is the top one, so the first
 	// hit while walking backwards is the one the user is pointing at.
-	for ( int i = (int)entry->children.size() - 1; i >= 0; i-- )
+	for ( int i = entry->childCount - 1; i >= 0; i-- )
 	{
 		VPANEL child = IsWithinTraverse( entry->children[i], x, y, traversePopups );
 		if ( child )
@@ -667,8 +721,9 @@ void CIPanel::PerformApplySchemeSettings( VPANEL h )
 	// already-set scheme down a subtree that was just parented.
 	entry->panel->OnThink();
 
-	for ( VPANEL child : entry ? entry->children : std::vector<VPANEL>() )
-		PerformApplySchemeSettings( child );
+	if ( entry )
+		for ( int i = 0; i < entry->childCount; i++ )
+			PerformApplySchemeSettings( entry->children[i] );
 }
 
 HScheme CIPanel::GetScheme( VPANEL h )
@@ -694,8 +749,9 @@ void CIPanel::Think( VPANEL h )
 	// panel itself overrides, and it is what per-frame work runs from.
 	entry->panel->OnThink();
 
-	for ( VPANEL child : entry ? entry->children : std::vector<VPANEL>() )
-		Think( child );
+	if ( entry )
+		for ( int i = 0; i < entry->childCount; i++ )
+			Think( entry->children[i] );
 }
 
 bool CIPanel::RequestInfo( VPANEL h, KeyValues *outputData )
