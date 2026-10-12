@@ -667,6 +667,16 @@ void *Sys_GetNativeObject( const char *obj )
 	if( !Q_strcmp( obj, "VGui2Factory" ))
 		return VGui2_GetFactory();
 
+	// The client library that draws with it, if the build ships one. The
+	// client dlopen()s this itself, but a plain dlopen only searches the
+	// process linker path - the APK and LD_LIBRARY_PATH - while COM_LoadLibrary
+	// also searches the game's filesystem, which is where a library dropped
+	// next to cstrike ends up. The game directory the client is told is
+	// relative ("cstrike"), and dlopen resolves a relative path against the
+	// process directory, which is not the game's parent.
+	if( !Q_strcmp( obj, "VGui2ClientLibrary" ))
+		return COM_LoadLibrary( "libvgui2client.so", false, false );
+
 	void *ptr = FS_GetNativeObject( obj );
 
 	if( ptr )
