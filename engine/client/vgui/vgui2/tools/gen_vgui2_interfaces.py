@@ -211,6 +211,8 @@ def main():
             lines.append("{")
             lines.append("\tm_factoryList = factoryList;")
             lines.append("\tm_numFactories = numFactories;")
+            if ret != "void":
+                lines.append("\treturn %s;" % zero_value(ret))
             lines.append("}")
             lines.append("")
         for return_type, name, args in methods:

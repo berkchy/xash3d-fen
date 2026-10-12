@@ -169,6 +169,7 @@ bool CIVGui::Init( CreateInterfaceFn *factoryList, int numFactories )
 {
 	m_factoryList = factoryList;
 	m_numFactories = numFactories;
+	return false;
 }
 
 
