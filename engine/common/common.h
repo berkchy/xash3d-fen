@@ -751,6 +751,11 @@ qboolean CL_IsRecordDemo( void );
 qboolean CL_IsPlaybackDemo( void );
 qboolean UI_CreditsActive( void );
 void *UI_GetMenuFactory( void );
+
+// Engine-side GoldSource VGUI2 CreateInterface, answered by
+// Sys_GetNativeObject("VGui2Factory"). Defined in C++ because the interfaces
+// it hands out are C++ classes with vtables.
+void *VGui2_GetFactory( void );
 int CL_GetMaxClients( void );
 #else
 static inline qboolean CL_Initialized( void ) { return false; }

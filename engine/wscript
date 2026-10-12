@@ -289,6 +289,16 @@ def build(bld):
 		# add client files
 		if not bld.env.DEDICATED:
 			source += bld.path.ant_glob('client/**/*.c')
+			# GoldSource VGUI2, engine half. C++ only: the client library
+			# (libvgui2client.so) resolves thirteen interfaces through
+			# Sys_GetNativeObject("VGui2Factory") and every one of them is
+			# NULL without this, so its panel code can never start. Kept in
+			# one directory so the C sources above stay C.
+			source += bld.path.ant_glob('client/vgui/vgui2/*.cpp')
+			includes += ['client/vgui/vgui2', 'client/vgui/vgui2/headers',
+				'client/vgui/vgui2/headers/tier0', 'client/vgui/vgui2/headers/tier1',
+				'client/vgui/vgui2/headers/tier2', 'client/vgui/vgui2/headers/common',
+				'client/vgui/vgui2/headers/mathlib']
 			libs += ['bzip2', 'MultiEmulator', 'opus', 'opusfile', 'vorbis', 'vorbisfile']
 
 		# Android port is linked differently

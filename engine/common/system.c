@@ -661,6 +661,12 @@ void *Sys_GetNativeObject( const char *obj )
 	if( !Q_strcmp( obj, "MenuFactory" ))
 		return UI_GetMenuFactory();
 
+	// GoldSource VGUI2. The client library asks for this once and then
+	// resolves thirteen interfaces through it; it was never answered, so
+	// VGUI2 in the client could not start.
+	if( !Q_strcmp( obj, "VGui2Factory" ))
+		return VGui2_GetFactory();
+
 	void *ptr = FS_GetNativeObject( obj );
 
 	if( ptr )
