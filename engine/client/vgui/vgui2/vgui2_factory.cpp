@@ -1,5 +1,10 @@
 // vgui2_factory.cpp - the "VGui2Factory" native object.
 //
+// This is the single translation unit that includes the generated interface
+// implementations. They are definitions, not declarations, so a second
+// translation unit including them would define every method twice - MSVC
+// reports that as LNK4006 and then dies in codegen with LNK1257.
+//
 // The client library resolves thirteen interfaces through this one function
 // (vgui2/src/tier2/tier2.cpp:55-103). Today Sys_GetNativeObject knows nothing
 // about VGUI2, so every one of those lookups returns NULL, tier2 refuses to
