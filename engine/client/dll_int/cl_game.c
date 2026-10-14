@@ -1013,7 +1013,7 @@ static qboolean CL_TryClientLoadingPanel( void )
 	if( !clgame.dllFuncs.pfnLoadingPanelDraw )
 		return false;
 
-	return clgame.dllFuncs.pfnLoadingPanelDraw( cls.loadingBar, cls.mapname ) ? true : false;
+	return clgame.dllFuncs.pfnLoadingPanelDraw( cls.loadingBar, clgame.mapname ) ? true : false;
 }
 
 void CL_DrawHUD( int state )
