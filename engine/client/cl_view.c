@@ -525,6 +525,7 @@ V_PostRender
 void V_PostRender( void )
 {
 	qboolean		draw_2d = false;
+	qboolean		vgui2_painted = false;
 
 	ref.dllFuncs.R_AllowFog( false );
 	ref.dllFuncs.R_Set2DMode( true );
@@ -540,6 +541,7 @@ void V_PostRender( void )
 		// HUD above is what draws the scoreboard there.
 		VGUI2_SetScreenSize( clgame.scrInfo.iWidth, clgame.scrInfo.iHeight );
 		VGUI2_Paint();
+		vgui2_painted = true;
 	}
 
 	switch( cls.scrshot_action )
@@ -567,6 +569,19 @@ void V_PostRender( void )
 		R_ShowTree();
 		Con_DrawConsole();
 		UI_UpdateMenu( host.realtime );
+
+		// A level load is not in the state the block above wants: signon stays
+		// short of SIGNONS until the first snapshot, so VGUI2 was skipped and
+		// the panels the client registers for the loading screen never got
+		// painted. Same for a client sitting outside a map. The console drew
+		// fine through the whole load, which is what made it look like only
+		// this one was missing.
+		if( !vgui2_painted )
+		{
+			VGUI2_SetScreenSize( clgame.scrInfo.iWidth, clgame.scrInfo.iHeight );
+			VGUI2_Paint();
+		}
+
 		// the loading panel goes on top of both: the console and the menu are
 		// up for the whole of a level load, and either one drawn afterwards
 		// covers the panel completely
