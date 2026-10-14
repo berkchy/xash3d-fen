@@ -109,6 +109,7 @@ static const dllfunc_t cdll_new_exports[] = 	// allowed only in SDK 2.3 and high
 { "IN_ClientLookEvent", (void **)&clgame.dllFuncs.pfnLookEvent}, // Xash3D FWGS ext
 { "HUD_GetSoundInterface", (void **)&clgame.dllFuncs.pfnGetSoundInterface },	// Xash3D FWGS ext
 { "Voice_StartChannel", (void **)&clgame.dllFuncs.pfnVoice_StartChannel }, // Xash3D FWGS ext
+{ "HUD_LoadingPanelDraw", (void **)&clgame.dllFuncs.pfnLoadingPanelDraw }, // Xash3D FWGS ext
 };
 
 static void pfnSPR_DrawHoles( int frame, int x, int y, const wrect_t *prc );
@@ -996,6 +997,25 @@ static void CL_DrawLoadingOrPaused( int tex, const char *label )
 	ref.dllFuncs.R_DrawStretchPic( x, y, width, height, 0, 0, 1, 1, tex );
 }
 
+/*
+====================
+CL_TryClientLoadingPanel
+
+Give the client library the screen first. The engine never calls pfnRedraw
+while a level loads, so a client that draws its own loading screen has no
+other way to get a frame - and a VGUI2 one has to live there anyway, since
+the client library is what boots the VGUI2 tree. Returns false when there is
+no hook or the client declined, which leaves CL_DrawLoadingOrPaused in charge.
+====================
+*/
+static qboolean CL_TryClientLoadingPanel( void )
+{
+	if( !clgame.dllFuncs.pfnLoadingPanelDraw )
+		return false;
+
+	return clgame.dllFuncs.pfnLoadingPanelDraw( cls.loadingBar, cls.mapname ) ? true : false;
+}
+
 void CL_DrawHUD( int state )
 {
 	if( state == CL_ACTIVE && !cl.video_prepped )
@@ -1027,7 +1047,8 @@ void CL_DrawHUD( int state )
 		}
 		break;
 	case CL_LOADING:
-		CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
+		if( !CL_TryClientLoadingPanel() )
+			CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
 		break;
 	case CL_CHANGELEVEL:
 		// draw_changelevel only marks the first frame, so taking it as the
@@ -1038,7 +1059,8 @@ void CL_DrawHUD( int state )
 		// its own flag, since that one must not take over the screen.
 		if( cls.draw_changelevel || (!cl.video_prepped && !cl.background) )
 		{
-			CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
+			if( !CL_TryClientLoadingPanel() )
+				CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
 			cls.draw_changelevel = false;
 		}
 		break;

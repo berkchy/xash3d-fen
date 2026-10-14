@@ -83,6 +83,13 @@ typedef struct cldll_func_s
 	// Sound API
 	int (*pfnGetSoundInterface)( int version, const sound_api_t *api, sound_interface_t *callback );
 	int (*pfnVoice_StartChannel)( int samples, byte *data, int entnum );
+	// Loading screen. The engine owns the loading bar, but it does not call
+	// pfnRedraw while a level loads, so a client that wants its own screen -
+	// a VGUI2 one, which has to come from the client library because that is
+	// where the VGUI2 tree is booted - has no way to paint one. Returns 1
+	// when it drew the screen, which tells the engine to leave its own bar
+	// alone; 0 falls back to CL_DrawLoadingOrPaused.
+	int (*pfnLoadingPanelDraw)( int loadingBar, const char *mapName );
 } cldll_func_t;
 
 #endif//CDLL_EXP_H
