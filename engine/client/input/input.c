@@ -56,6 +56,13 @@ CVAR_DEFINE_AUTO( bhop_assist, "1", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "bunny hop
 CVAR_DEFINE_AUTO( bhop_ground_dist, "37.7", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "height above ground at which bunny hop releases jump" );
 CVAR_DEFINE_AUTO( bhop_debug, "0", FCVAR_ARCHIVE, "print ground distance and +gs state once a second" );
 
+CVAR_DEFINE_AUTO( cl_autojump, "1", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "Automatically jump when landing while +jump is held" );
+CVAR_DEFINE_AUTO( cl_strafe, "0", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "Enable air strafe assist" );
+CVAR_DEFINE_AUTO( cl_strafe_dir, "3", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "Strafe assist direction (1-4)" );
+CVAR_DEFINE_AUTO( cl_strafe_sidemove, "450", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "Strafe assist side move speed" );
+CVAR_DEFINE_AUTO( cl_strafe_angle, "30", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "Strafe assist angle threshold" );
+CVAR_DEFINE_AUTO( cl_strafe_speed, "70", FCVAR_ARCHIVE | FCVAR_FILTERABLE, "Strafe assist forward speed" );
+
 // state for +gs, see IN_GroundStrafe
 static struct
 {
@@ -462,6 +469,12 @@ void IN_Init( void )
 	Cvar_RegisterVariable( &bhop_assist );
 	Cvar_RegisterVariable( &bhop_ground_dist );
 	Cvar_RegisterVariable( &bhop_debug );
+	Cvar_RegisterVariable( &cl_autojump );
+	Cvar_RegisterVariable( &cl_strafe );
+	Cvar_RegisterVariable( &cl_strafe_dir );
+	Cvar_RegisterVariable( &cl_strafe_sidemove );
+	Cvar_RegisterVariable( &cl_strafe_angle );
+	Cvar_RegisterVariable( &cl_strafe_speed );
 
 	Cmd_AddCommand( "+gs", IN_GroundStrafe_f, "ground strafe, tap duck on landing" );
 	Cmd_AddCommand( "-gs", IN_GroundStrafeEnd_f, "stop ground strafe" );
@@ -885,6 +898,121 @@ static void IN_BunnyHop( usercmd_t *cmd, float ground_dist )
 	cmd->buttons &= ~IN_JUMP;
 }
 
+static qboolean in_autojump_prev_jump = false;
+
+static void IN_AutoJump( usercmd_t *cmd, float ground_dist )
+{
+	if( !cmd )
+		return;
+
+	if( cl_autojump.value < 0.5f )
+	{
+		in_autojump_prev_jump = (cmd->buttons & IN_JUMP) != 0;
+		return;
+	}
+
+	const qboolean onground = IN_IsOnGround( ground_dist );
+	const qboolean inwater = cl.local.waterlevel >= 2;
+	const qboolean walking = cl.frames[cl.parsecountmod].playerstate[cl.playernum].movetype == MOVETYPE_WALK;
+
+	qboolean should_release = (!onground && !inwater && walking);
+
+	if( in_autojump_prev_jump && onground && !inwater && walking )
+		should_release = true;
+
+	if( should_release )
+		cmd->buttons &= ~IN_JUMP;
+
+	in_autojump_prev_jump = (cmd->buttons & IN_JUMP) != 0;
+}
+
+static void IN_StrafeAssist( usercmd_t *cmd )
+{
+	if( !cmd || cl_strafe.value < 0.5f )
+		return;
+
+	if( cl.local.onground != -1 || cl.local.waterlevel >= 2 )
+		return;
+
+	if( cl.frames[cl.parsecountmod].playerstate[cl.playernum].movetype == MOVETYPE_NOCLIP )
+		return;
+
+	float speed = (sqrt( cl.simvel[0] * cl.simvel[0] + cl.simvel[1] * cl.simvel[1] ) < 15.0f);
+
+	float dir = 0.0f;
+	int dir_value = (int)cl_strafe_dir.value;
+	if( dir_value == 2 ) dir = 90.0f * M_PI / 180.0f;
+	else if( dir_value == 3 ) dir = 180.0f * M_PI / 180.0f;
+	else if( dir_value == 4 ) dir = -90.0f * M_PI / 180.0f;
+
+	if( speed )
+	{
+		if( cmd->buttons & IN_FORWARD )
+		{
+			if( cmd->buttons & IN_MOVELEFT ) { cmd->forwardmove = 900; cmd->sidemove = -900; }
+			else if( cmd->buttons & IN_MOVERIGHT ) { cmd->forwardmove = 900; cmd->sidemove = 900; }
+			else cmd->forwardmove = 900;
+		}
+		else if( cmd->buttons & IN_BACK )
+		{
+			if( cmd->buttons & IN_MOVELEFT ) { cmd->forwardmove = -900; cmd->sidemove = -900; }
+			else if( cmd->buttons & IN_MOVERIGHT ) { cmd->forwardmove = -900; cmd->sidemove = 900; }
+			else cmd->forwardmove = -900;
+		}
+		else if( cmd->buttons & IN_MOVELEFT ) cmd->sidemove = -900;
+		else if( cmd->buttons & IN_MOVERIGHT ) cmd->sidemove = 900;
+		else cmd->forwardmove = 900;
+	}
+	else
+	{
+		float va_speed = atan2( cl.simvel[1], cl.simvel[0] );
+		float adif = va_speed - cl.viewangles[1] * M_PI / 180.0f - dir;
+		adif = sin( adif );
+		float denom = sqrt( 1.0f - adif * adif );
+		if( denom == 0.0f ) denom = 1.0f;
+		adif = atan2( adif, denom );
+
+		cmd->sidemove = cl_strafe_sidemove.value * (adif > 0 ? -1.0f : 1.0f);
+		cmd->forwardmove = 0.0f;
+
+		float angle = cl.viewangles[1] * M_PI / 180.0f;
+		float osin = sin( angle );
+		float ocos = cos( angle );
+		angle = 2.0f * cl.viewangles[1] * M_PI / 180.0f - va_speed + dir;
+		float nsin = sin( angle );
+		float ncos = cos( angle );
+
+		cmd->forwardmove = cmd->sidemove * (osin * ncos - ocos * nsin);
+		cmd->sidemove *= osin * nsin + ocos * ncos;
+
+		float fs = 0.0f;
+		float threshold = atan2( cl_strafe_angle.value / (va_speed == 0.0f ? 1.0f : va_speed), 1.0f );
+		if( threshold >= fabs( adif ) )
+		{
+			float yaw = cl.viewangles[1] * M_PI / 180.0f;
+			float fx = cos( yaw ), fy = sin( yaw );
+			float rx = -sin( yaw ), ry = cos( yaw );
+			float bx, by;
+			if( dir_value & 1 ) { bx = fx; by = fy; }
+			else { bx = rx; by = ry; }
+			float vel = (bx * cl.simvel[0]) * (bx * cl.simvel[0]) + (by * cl.simvel[1]) * (by * cl.simvel[1]);
+			if( vel > 0.0f )
+				fs = sqrt( cl_strafe_speed.value * 100000.0f / vel );
+		}
+		cmd->forwardmove += fs;
+	}
+
+	float sdmw = cmd->sidemove;
+	float fdmw = cmd->forwardmove;
+	switch( dir_value )
+	{
+		case 1: cmd->forwardmove = fdmw; cmd->sidemove = sdmw; break;
+		case 2: cmd->forwardmove = -sdmw; cmd->sidemove = fdmw; break;
+		case 3: cmd->forwardmove = -fdmw; cmd->sidemove = -sdmw; break;
+		case 4: cmd->forwardmove = sdmw; cmd->sidemove = -fdmw; break;
+	}
+}
+
 static void IN_GroundStrafe_f( void )
 {
 	gs_state.enabled = true;
@@ -945,6 +1073,8 @@ void IN_EngineAppendMove( float frametime, usercmd_t *cmd, qboolean active )
 
 			IN_GroundStrafe( cmd, ground_dist );
 			IN_BunnyHop( cmd, ground_dist );
+			IN_AutoJump( cmd, ground_dist );
+			IN_StrafeAssist( cmd );
 
 			if( bhop_debug.value > 0.5f )
 			{

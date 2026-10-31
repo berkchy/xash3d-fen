@@ -664,8 +664,10 @@ void *Sys_GetNativeObject( const char *obj )
 	// GoldSource VGUI2. The client library asks for this once and then
 	// resolves thirteen interfaces through it; it was never answered, so
 	// VGUI2 in the client could not start.
+#if !XASH_DEDICATED
 	if( !Q_strcmp( obj, "VGui2Factory" ))
 		return VGui2_GetFactory();
+#endif
 
 	// The client library that draws with it, if the build ships one. The
 	// client dlopen()s this itself, but a plain dlopen only searches the

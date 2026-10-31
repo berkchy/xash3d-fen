@@ -97,6 +97,7 @@ cl_enginefunc_t: the client dll copies that struct wholesale, so growing it
 breaks every engine APK that is older than the dll.
 ========================
 */
+#if !XASH_DEDICATED
 android_motdapi_t *Android_GetMOTDAPI( void )
 {
 	static android_motdapi_t motdapi =
@@ -108,6 +109,9 @@ android_motdapi_t *Android_GetMOTDAPI( void )
 
 	return &motdapi;
 }
+#else
+android_motdapi_t *Android_GetMOTDAPI( void ) { return NULL; }
+#endif
 
 /*
 ========================
