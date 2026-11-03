@@ -234,7 +234,7 @@ qboolean Con_LoadTTFFont( const char *fontname, const char *texname, cl_font_t *
 	atlasW = cellW * 16;
 	atlasH = cellH * 16;
 
-	atlas = Mem_Calloc( atlasW * atlasH * 4 );
+	atlas = Mem_Calloc( cls.mempool, atlasW * atlasH * 4 );
 	charset = Cvar_VariableString( "con_charset" );
 
 	for( int i = 0; i < 256; i++ )
