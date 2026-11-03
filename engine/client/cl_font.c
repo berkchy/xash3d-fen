@@ -190,6 +190,40 @@ static uint32_t CL_TTFCodepointForByte( int ch, const char *charset )
 	return (uint32_t)ch;
 }
 
+static const char *CL_NormalizeTTFPath( const char *in, char *out, size_t size )
+{
+	const char *game;
+	const char *p = in;
+	const char *slash;
+
+	if( !in || !in[0] )
+		return in;
+
+	if( !Q_strnicmp( p, "/sdcard/xash/", 13 ))
+	{
+		p += 13;
+		slash = strchr( p, '/' );
+		if( slash )
+			p = slash + 1;
+	}
+
+	game = FS_Gamedir();
+	if( game && game[0] )
+	{
+		size_t len = Q_strlen( game );
+
+		if( !Q_strnicmp( p, game, len ) && p[len] == '/' )
+			p += len + 1;
+	}
+
+	if( !strchr( p, '/' ))
+		Q_snprintf( out, size, "fonts/%s", p );
+	else
+		Q_strncpy( out, p, size );
+
+	return out;
+}
+
 qboolean Con_LoadTTFFont( const char *fontname, const char *texname, cl_font_t *font, float scale, convar_t *rendermode, uint texFlags )
 {
 	fs_offset_t length;
@@ -203,6 +237,7 @@ qboolean Con_LoadTTFFont( const char *fontname, const char *texname, cl_font_t *
 	byte *atlas;
 	rgbdata_t pic;
 	const char *charset;
+	string normalized;
 
 	if( !rendermode )
 		return false;
@@ -210,12 +245,17 @@ qboolean Con_LoadTTFFont( const char *fontname, const char *texname, cl_font_t *
 	if( font->valid )
 		return true;
 
+	fontname = CL_NormalizeTTFPath( fontname, normalized, sizeof( normalized ));
 	data = g_fsapi.LoadFile( fontname, &length, false );
 	if( !data )
+	{
+		Con_Printf( S_ERROR "TTF font not found: %s\n", fontname );
 		return false;
+	}
 
 	if( !stbtt_InitFont( &info, data, stbtt_GetFontOffsetForIndex( data, 0 )))
 	{
+		Con_Printf( S_ERROR "TTF font is invalid: %s\n", fontname );
 		Mem_Free( data );
 		return false;
 	}
@@ -317,7 +357,10 @@ qboolean Con_LoadTTFFont( const char *fontname, const char *texname, cl_font_t *
 	Mem_Free( data );
 
 	if( !font->hFontTexture )
+	{
+		Con_Printf( S_ERROR "TTF font texture failed: %s\n", fontname );
 		return false;
+	}
 
 	font->type = FONT_VARIABLE;
 	font->valid = true;
@@ -325,6 +368,7 @@ qboolean Con_LoadTTFFont( const char *fontname, const char *texname, cl_font_t *
 	font->rendermode = rendermode;
 	font->charHeight = cellH;
 
+	Con_Printf( "TTF font loaded: %s (%dx%d, texture %d)\n", fontname, atlasW, atlasH, font->hFontTexture );
 	return true;
 }
 
