@@ -18,6 +18,11 @@ GNU General Public License for more details.
 #include "client.h"
 #include "qfont.h"
 #include "swaplib.h"
+#include "utflib.h"
+
+#define STBTT_STATIC
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "../../3rdparty/mainui/font/stb_truetype.h"
 
 le_struct_begin( charinfo_swap )
 	le_struct_field( charinfo, startoffset )
@@ -164,6 +169,161 @@ qboolean Con_LoadVariableWidthFont( const char *fontname, cl_font_t *font, float
 
 		font->charWidths[i] = Q_rint( src.fontinfo[i].charwidth * scale );
 	}
+
+	return true;
+}
+
+static uint32_t CL_TTFCodepointForByte( int ch, const char *charset )
+{
+	if( ch < 0x80 )
+		return ch;
+
+	qboolean cp1251 = !Q_stricmp( charset, "cp1251" );
+
+	for( uint32_t u = 0x80; u < 0x2200; u++ )
+	{
+		uint32_t mapped = cp1251 ? Q_UnicodeToCP1251( u ) : Q_UnicodeToCP1252( u );
+		if( mapped == (uint32_t)ch )
+			return u;
+	}
+
+	return (uint32_t)ch;
+}
+
+qboolean Con_LoadTTFFont( const char *fontname, const char *texname, cl_font_t *font, float scale, convar_t *rendermode, uint texFlags )
+{
+	fs_offset_t length;
+	byte *data;
+	stbtt_fontinfo info;
+	int ascent, descent, lineGap;
+	float pixelHeight;
+	float sf;
+	int ascentPx, descentPx, cellW, cellH;
+	int atlasW, atlasH;
+	byte *atlas;
+	rgbdata_t pic;
+	const char *charset;
+
+	if( !rendermode )
+		return false;
+
+	if( font->valid )
+		return true;
+
+	data = g_fsapi.LoadFile( fontname, &length, false );
+	if( !data )
+		return false;
+
+	if( !stbtt_InitFont( &info, data, stbtt_GetFontOffsetForIndex( data, 0 )))
+	{
+		Mem_Free( data );
+		return false;
+	}
+
+	stbtt_GetFontVMetrics( &info, &ascent, &descent, &lineGap );
+
+	pixelHeight = 18.0f * ( scale > 0.0f ? scale : 1.0f );
+	if( pixelHeight < 8.0f ) pixelHeight = 8.0f;
+	if( pixelHeight > 64.0f ) pixelHeight = 64.0f;
+
+	sf = stbtt_ScaleForPixelHeight( &info, pixelHeight );
+	ascentPx = Q_rint( ascent * sf );
+	descentPx = Q_rint( -descent * sf );
+	cellW = Q_rint( pixelHeight * 2.0f ) + 4;
+	cellH = ascentPx + descentPx + 4;
+	atlasW = cellW * 16;
+	atlasH = cellH * 16;
+
+	atlas = Mem_Calloc( atlasW * atlasH * 4 );
+	charset = Cvar_VariableString( "con_charset" );
+
+	for( int i = 0; i < 256; i++ )
+	{
+		int cellX = ( i % 16 ) * cellW;
+		int cellY = ( i / 16 ) * cellH;
+		int advance = 0, lsb = 0;
+		int gw = 0, gh = 0, xoff = 0, yoff = 0;
+		int right;
+
+		font->fontRc[i].left   = cellX;
+		font->fontRc[i].right  = cellX + 1;
+		font->fontRc[i].top    = cellY;
+		font->fontRc[i].bottom = cellY + cellH;
+		font->charWidths[i] = 0;
+
+		if( i < 32 )
+			continue;
+
+		uint32_t cp = CL_TTFCodepointForByte( i, charset );
+
+		stbtt_GetCodepointHMetrics( &info, cp, &advance, &lsb );
+
+		int advancePx = Q_rint( advance * sf );
+		if( advancePx < 0 ) advancePx = 0;
+		if( advancePx > 255 ) advancePx = 255;
+		font->charWidths[i] = (byte)advancePx;
+
+		if( i == ' ' )
+			continue;
+
+		unsigned char *bitmap = stbtt_GetCodepointBitmap( &info, 0, sf, cp, &gw, &gh, &xoff, &yoff );
+		if( !bitmap )
+			continue;
+
+		int gx = cellX + 2 + xoff;
+		int gy = cellY + 2 + ascentPx + yoff;
+
+		for( int y = 0; y < gh; y++ )
+		{
+			int dy = gy + y;
+			if( dy < cellY || dy >= cellY + cellH )
+				continue;
+
+			for( int x = 0; x < gw; x++ )
+			{
+				int dx = gx + x;
+				if( dx < cellX || dx >= cellX + cellW )
+					continue;
+
+				byte a = bitmap[y * gw + x];
+				if( !a )
+					continue;
+
+				byte *dst = atlas + ( dy * atlasW + dx ) * 4;
+				dst[0] = dst[1] = dst[2] = 255;
+				if( a > dst[3] ) dst[3] = a;
+			}
+		}
+
+		right = gx - cellX + gw;
+		if( right < 1 ) right = 1;
+		if( right > cellW ) right = cellW;
+		font->fontRc[i].right = cellX + right;
+
+		stbtt_FreeBitmap( bitmap, NULL );
+	}
+
+	memset( &pic, 0, sizeof( pic ));
+	pic.width = atlasW;
+	pic.height = atlasH;
+	pic.depth = 4;
+	pic.type = PF_RGBA_32;
+	pic.flags = IMAGE_HAS_COLOR|IMAGE_HAS_ALPHA;
+	pic.buffer = atlas;
+	pic.size = atlasW * atlasH * 4;
+
+	font->hFontTexture = ref.dllFuncs.GL_LoadTextureFromBuffer( texname, &pic, texFlags|TF_FONT, false );
+	Mem_Free( atlas );
+	Mem_Free( data );
+
+	if( !font->hFontTexture )
+		return false;
+
+	font->type = FONT_VARIABLE;
+	font->valid = true;
+	font->scale = 1.0f;
+	font->rendermode = rendermode;
+	font->charHeight = cellH;
 
 	return true;
 }

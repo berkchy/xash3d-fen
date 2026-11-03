@@ -36,6 +36,7 @@ static CVAR_DEFINE_AUTO( con_bgcolor, "0 0 0", FCVAR_ARCHIVE, "console backgroun
 static CVAR_DEFINE_AUTO( con_bgalpha, "255", FCVAR_ARCHIVE, "opacity of con_bgcolor, 0-255" );
 static CVAR_DEFINE_AUTO( scr_drawversion, "1", FCVAR_ARCHIVE, "draw version in menu or screenshots, doesn't affect console" );
 static CVAR_DEFINE_AUTO( con_oldfont, "0", 0, "use legacy font from gfx.wad, might be missing or broken" );
+static CVAR_DEFINE_AUTO( con_font_ttf, "", FCVAR_ARCHIVE, "console TTF font path relative to game directory, e.g. fonts/font.ttf" );
 static CVAR_DEFINE_AUTO( con_showcompletion, "1", FCVAR_ARCHIVE, "perform simplified autocompletion while typing" );
 
 static int g_codepage = 0;
@@ -593,29 +594,43 @@ static void Con_LoadConsoleFont( int fontNumber, cl_font_t *font )
 	if( font->valid )
 		return; // already loaded
 
-	if( con_oldfont.value )
+	if( con_font_ttf.string[0] )
 	{
-		success = Con_LoadVariableWidthFont( "gfx/conchars.fnt", font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
-	}
-	else
-	{
-		string path;
-		dword crc = 0;
+		string texname;
 
-		// replace default fonts.wad textures by current charset's font
-		if( !CRC32_File( &crc, "fonts.wad" ) || crc == 0x3c0a0029 )
-		{
-			if( Q_snprintf( path, sizeof( path ),
-				"font%i_%s.fnt", fontNumber, Cvar_VariableString( "con_charset" )) > 0 )
-			{
-				success = Con_LoadVariableWidthFont( path, font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
-			}
-		}
+		Q_snprintf( texname, sizeof( texname ), "%s#%i", con_font_ttf.string, fontNumber );
+		success = Con_LoadTTFFont( con_font_ttf.string, texname, font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
 
 		if( !success )
+			Con_DPrintf( S_WARN "failed to load TTF console font %s\n", con_font_ttf.string );
+	}
+
+	if( !success )
+	{
+		if( con_oldfont.value )
 		{
-			Q_snprintf( path, sizeof( path ), "fonts/font%i", fontNumber );
-			success = Con_LoadVariableWidthFont( path, font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
+			success = Con_LoadVariableWidthFont( "gfx/conchars.fnt", font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
+		}
+		else
+		{
+			string path;
+			dword crc = 0;
+
+			// replace default fonts.wad textures by current charset's font
+			if( !CRC32_File( &crc, "fonts.wad" ) || crc == 0x3c0a0029 )
+			{
+				if( Q_snprintf( path, sizeof( path ),
+					"font%i_%s.fnt", fontNumber, Cvar_VariableString( "con_charset" )) > 0 )
+				{
+					success = Con_LoadVariableWidthFont( path, font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
+				}
+			}
+
+			if( !success )
+			{
+				Q_snprintf( path, sizeof( path ), "fonts/font%i", fontNumber );
+				success = Con_LoadVariableWidthFont( path, font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
+			}
 		}
 	}
 
@@ -826,6 +841,7 @@ void Con_Init( void )
 	Cvar_RegisterVariable( &con_bgalpha );
 	Cvar_RegisterVariable( &scr_drawversion );
 	Cvar_RegisterVariable( &con_oldfont );
+	Cvar_RegisterVariable( &con_font_ttf );
 	Cvar_RegisterVariable( &con_showcompletion );
 
 	// init the console buffer
@@ -2230,7 +2246,7 @@ void Con_RunConsole( void )
 			con.vislines = con.showlines;
 	}
 
-	if( FBitSet( con_charset.flags|con_fontscale.flags|con_fontnum.flags|cl_charset.flags|con_oldfont.flags, FCVAR_CHANGED ))
+	if( FBitSet( con_charset.flags|con_fontscale.flags|con_fontnum.flags|cl_charset.flags|con_oldfont.flags|con_font_ttf.flags, FCVAR_CHANGED ))
 	{
 		if( con_fontscale.value < 1.0f )
 			Cvar_DirectSet( &con_fontscale, "1" );
@@ -2257,6 +2273,7 @@ void Con_RunConsole( void )
 		ClearBits( con_fontscale.flags, FCVAR_CHANGED );
 		ClearBits( cl_charset.flags,    FCVAR_CHANGED );
 		ClearBits( con_oldfont.flags,   FCVAR_CHANGED );
+		ClearBits( con_font_ttf.flags,  FCVAR_CHANGED );
 	}
 }
 
