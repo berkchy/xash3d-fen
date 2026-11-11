@@ -31,7 +31,6 @@ import android.content.pm.ActivityInfo;
 import android.content.res.AssetManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.Settings.Secure;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -253,6 +252,13 @@ public class XashActivity extends SDLActivity {
 		CrashReports.writeIntentInfo(this, sb.toString());
 	}
 
+	/** The launcher's own Android data directory (Android/data/<pkg>/files) -
+	 *  the default place to find game data, no storage permissions needed. */
+	private String defaultBaseDir() {
+		File ext = getExternalFilesDir(null);
+		return (ext != null ? ext : getFilesDir()).getAbsolutePath();
+	}
+
 	// TODO: REMOVE LATER, temporary launchers support?
 	@Override
 	protected String[] getArguments() {
@@ -284,8 +290,7 @@ public class XashActivity extends SDLActivity {
 		if (basedir != null) {
 			nativeSetenv("XASH3D_BASEDIR", basedir);
 		} else {
-			String rootPath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/xash";
-			nativeSetenv("XASH3D_BASEDIR", rootPath);
+			nativeSetenv("XASH3D_BASEDIR", defaultBaseDir());
 		}
 
 		mUseVolumeKeys = getIntent().getBooleanExtra("usevolume", false);
@@ -378,7 +383,9 @@ public class XashActivity extends SDLActivity {
                         String raw = htmlBytes != null ? new String( htmlBytes, "UTF-8" ) : "";
                         Log.i( TAG, "MOTD dialog: payloadBytes="
                                 + ( htmlBytes != null ? htmlBytes.length : -1 ));
-                        String base = Environment.getExternalStorageDirectory().getAbsolutePath() + "/xash";
+                        String base = getIntent().getStringExtra("basedir");
+                        if (base == null)
+                                base = defaultBaseDir();
                         String game = "cstrike";
                         final File gameDir = new File( base, game );
 
