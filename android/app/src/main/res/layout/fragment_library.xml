@@ -18,6 +18,43 @@
 			android:paddingHorizontal="8dp"
 			app:layoutManager="LinearLayoutManager"
 			tools:listitem="@layout/card_game" />
+
+		<LinearLayout
+			android:id="@+id/emptyView"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:layout_centerInParent="true"
+			android:gravity="center"
+			android:orientation="vertical"
+			android:paddingHorizontal="32dp"
+			android:visibility="gone">
+
+			<ImageView
+				android:layout_width="96dp"
+				android:layout_height="96dp"
+				android:contentDescription="@string/install_game"
+				android:src="@drawable/ic_baseline_folder_open_24"
+				android:tint="?attr/colorOnSurfaceVariant" />
+
+			<com.google.android.material.textview.MaterialTextView
+				android:id="@+id/emptyTitle"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="24dp"
+				android:text="@string/no_games_found_title"
+				android:textAppearance="@style/TextAppearance.Material3.HeadlineSmall" />
+
+			<com.google.android.material.textview.MaterialTextView
+				android:id="@+id/emptyMessage"
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:layout_marginTop="8dp"
+				android:gravity="center"
+				android:text="@string/no_games_found_message"
+				android:textAlignment="center"
+				android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+				android:textColor="?attr/colorOnSurfaceVariant" />
+		</LinearLayout>
 	</RelativeLayout>
 
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

@@ -129,6 +129,7 @@ extensions.configure<ApplicationExtension> {
 
 dependencies {
 	implementation(libs.material)
+	implementation(libs.documentfile)
 
 	implementation(libs.appcompat)
 	implementation(libs.navigation.runtime.ktx)

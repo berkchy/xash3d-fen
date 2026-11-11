@@ -63,4 +63,17 @@
 	<string name="engine_update_permission_message">To install the update, allow Xash3D FWGS to install unknown apps in system settings.</string>
 	<string name="engine_update_open_settings">Open settings</string>
 	<string name="engine_install_failed">Update install failed: %1$s</string>
+	<string name="no_games_found_title">No games found</string>
+	<string name="no_games_found_message">Install a game into the app data folder — tap the folder icon in the top bar.</string>
+	<string name="install_game">Install game</string>
+	<string name="installing_game">Installing game…</string>
+	<string name="installing_status">Copying %1$s</string>
+	<string name="installing_detail">%1$d/%2$d files · %3$d MB / %4$d MB</string>
+	<string name="install_cancel">Cancel</string>
+	<string name="install_cancelled">Installation cancelled</string>
+	<string name="install_failed_title">Install failed</string>
+	<string name="install_failed_message">Could not copy the game folder.\n\n%1$s</string>
+	<string name="install_finished">Game installed</string>
+	<string name="install_exists_title">Already installed</string>
+	<string name="install_exists_message">A folder named \"%1$s\" already exists in the app data directory.</string>
 </resources>
