@@ -718,8 +718,22 @@ void SCR_LoadCreditsFont( void )
 	float scale = hud_fontscale.value;
 	dword crc = 0;
 
-	// replace default gfx.wad textures by current charset's font
-	if( !CRC32_File( &crc, "gfx.wad" ) || crc == 0x49eb9f16 )
+	// TrueType HUD font first (tahoma is CS 1.6's signature face);
+	// HUD text only - the console keeps Con_GetFont().
+	// Bilinear (TF_FONT) - nearest-neighbor smoothing made the glyphs worse
+	if( Con_LoadTTFFont( "gfx/fonts/tahoma.ttf", "fonts/tahoma.ttf#credits", font, scale, &hud_fontrender, TF_FONT ))
+	{
+		success = true;
+		Con_Printf( "HUD font: TrueType (gfx/fonts/tahoma.ttf)\n" );
+	}
+	else if( Con_LoadTTFFont( "gfx/fonts/FiraSans-Regular.ttf", "fonts/FiraSans-Regular.ttf#credits", font, scale, &hud_fontrender, TF_FONT ))
+	{
+		success = true;
+		Con_Printf( "HUD font: TrueType (gfx/fonts/FiraSans-Regular.ttf)\n" );
+	}
+
+	// replace default gfx.wad textures by current charset's font, only when no TrueType font
+	if( !success && ( !CRC32_File( &crc, "gfx.wad" ) || crc == 0x49eb9f16 ))
 	{
 		string charsetFnt;
 
@@ -727,15 +741,16 @@ void SCR_LoadCreditsFont( void )
 			"creditsfont_%s.fnt", Cvar_VariableString( "con_charset" )) > 0 )
 		{
 			if( FS_FileExists( charsetFnt, false ))
-				success = Con_LoadVariableWidthFont( charsetFnt, font, scale, &hud_fontrender, TF_FONT );
+				success = Con_LoadVariableWidthFont( charsetFnt, font, scale, &hud_fontrender, TF_FONT|TF_NEAREST );
 		}
 	}
 
 	if( !success )
-		success = Con_LoadVariableWidthFont( "gfx/creditsfont.fnt", font, scale, &hud_fontrender, TF_FONT );
+		success = Con_LoadVariableWidthFont( "gfx/creditsfont.fnt", font, scale, &hud_fontrender, TF_FONT|TF_NEAREST );
 
+	// it's a Quake font, we need to keep source texture for it
 	if( !success )
-		success = Con_LoadFixedWidthFont( "gfx/conchars", font, scale, &hud_fontrender, TF_FONT|TF_NEAREST );
+		success = Con_LoadFixedWidthFont( "gfx/conchars", font, scale, &hud_fontrender, TF_FONT|TF_NEAREST|TF_KEEP_SOURCE );
 
 	// copy font size for client.dll
 	if( success )

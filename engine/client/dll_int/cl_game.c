@@ -279,6 +279,19 @@ static int CL_AdjustYPos( float y, int height )
 
 /*
 =============
+CL_GetHudFont
+
+the HUD draws with the same crisp credits font the client exports use;
+falls back to the console font when no credits font is loaded
+=============
+*/
+static cl_font_t *CL_GetHudFont( void )
+{
+	return cls.creditsFont.valid ? &cls.creditsFont : Con_GetCurFont();
+}
+
+/*
+=============
 CL_CenterPrint
 
 print centerscreen message
@@ -286,7 +299,7 @@ print centerscreen message
 */
 void CL_CenterPrint( const char *text, float y )
 {
-	cl_font_t *font = Con_GetCurFont();
+	cl_font_t *font = CL_GetHudFont();
 
 	if( COM_StringEmptyOrNULL( text ) || !font || !font->valid )
 		return;
@@ -425,7 +438,7 @@ called each frame
 */
 void CL_DrawCenterPrint( void )
 {
-	cl_font_t *font = Con_GetCurFont();
+	cl_font_t *font = CL_GetHudFont();
 	byte	line[MAX_LINELENGTH];
 	int	charHeight;
 
@@ -906,7 +919,7 @@ static void CL_DrawLoadingPanel( const char *label )
 	const qboolean downloading = scr_download.value >= 0.0f;
 	const float percent = downloading ? bound( 0.0f, scr_download.value, 100.0f ) : 0.0f;
 
-	cl_font_t *font = Con_GetFont( con_fontsize.value );
+	cl_font_t *font = CL_GetHudFont();
 	const int line = font ? font->charHeight : 16;
 	char info[256];
 
@@ -2102,7 +2115,7 @@ drawing string like a console string
 */
 int GAME_EXPORT pfnDrawConsoleString( int x, int y, char *string )
 {
-	cl_font_t *font = Con_GetFont( con_fontsize.value );
+	cl_font_t *font = CL_GetHudFont();
 	rgba_t color;
 	Vector4Copy( clgame.ds.textColor, color );
 	Vector4Set( clgame.ds.textColor, 255, 255, 255, 255 );
@@ -2135,7 +2148,7 @@ compute string length in screen pixels
 */
 void GAME_EXPORT pfnDrawConsoleStringLen( const char *pText, int *length, int *height )
 {
-	cl_font_t *font = Con_GetFont( con_fontsize.value );
+	cl_font_t *font = CL_GetHudFont();
 
 	if( height ) *height = font->charHeight;
 	CL_DrawStringLen( font, pText, length, NULL, FONT_DRAW_UTF8 | FONT_DRAW_HUD );
