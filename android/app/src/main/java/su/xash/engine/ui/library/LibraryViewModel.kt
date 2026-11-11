@@ -14,7 +14,7 @@ import su.xash.engine.model.Game
 import su.xash.engine.util.Nomedia
 import java.io.File
 
-class LibraryViewModel(application: Application) : AndroidViewModel(application) {
+class LibraryViewModel(app: Application) : AndroidViewModel(app) {
 	val installedGames: LiveData<List<Game>> get() = _installedGames
 	private val _installedGames = MutableLiveData(emptyList<Game>())
 
@@ -25,7 +25,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 	private val _selectedItem = MutableLiveData<Game>()
 
 	private val appPreferences: SharedPreferences =
-		application.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
+		app.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
 
 	fun reloadGames(ctx: Context) {
 		if (isReloading.value == true) {
@@ -36,8 +36,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 		viewModelScope.launch {
 			withContext(Dispatchers.IO) {
 				val rootPath = appPreferences.getString("game_path", null)
-					?: (application.getExternalFilesDir(null)?.absolutePath
-						?: application.filesDir.absolutePath)
+					?: (ctx.getExternalFilesDir(null)?.absolutePath
+						?: ctx.filesDir.absolutePath)
 				val root = File(rootPath)
 
 				Nomedia.ensureNomedia(root)

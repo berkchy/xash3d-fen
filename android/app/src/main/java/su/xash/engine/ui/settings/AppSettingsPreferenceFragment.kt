@@ -14,7 +14,7 @@ class AppSettingsPreferenceFragment() : PreferenceFragmentCompat() {
 		val defaultPath = requireContext().getExternalFilesDir(null)?.absolutePath
 			?: requireContext().filesDir.absolutePath
 		val gamePath = preferenceManager.sharedPreferences
-			.getString("game_path", null) ?: defaultPath
+			?.getString("game_path", null) ?: defaultPath
 		findPreference<Preference>("game_path")?.summary = gamePath
 
 		findPreference<Preference>("crash_logs")?.setOnPreferenceClickListener {
