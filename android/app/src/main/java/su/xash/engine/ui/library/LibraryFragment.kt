@@ -102,8 +102,60 @@ class LibraryFragment : Fragment(), MenuProvider {
 
 	private data class CopyItem(val src: DocumentFile, val dest: File, val bytes: Long)
 
-	private fun appFilesDir(): File =
-		requireContext().getExternalFilesDir(null) ?: requireContext().filesDir
+	private sealed interface InstallPlan {
+		data class Ok(val targets: List<Pair<DocumentFile, File>>, val items: List<CopyItem>, val totalBytes: Long) : InstallPlan
+		data class Error(val message: String) : InstallPlan
+		data class Exists(val name: String) : InstallPlan
+	}
+
+	// heavy Storage Access Framework walk - must run off the UI thread
+	private fun computeInstallPlan(ctx: android.content.Context, treeUri: Uri): InstallPlan {
+		val root = DocumentFile.fromTreeUri(ctx, treeUri)
+			?: return InstallPlan.Error("Could not open the selected folder.")
+
+		if (!root.isDirectory) {
+			return InstallPlan.Error("The selected item is not a folder.")
+		}
+
+		// figure out what to copy where:
+		// - the picked folder is a game folder  -> copy into files/<folder>
+		// - the picked folder holds game folders -> copy each game folder into files/
+		// - anything else                        -> copy as files/<folder>
+		val appFiles = appFilesDir(ctx)
+		val targets = mutableListOf<Pair<DocumentFile, File>>()
+
+		if (findGameInfoFile(root) != null) {
+			targets.add(root to File(appFiles, sanitize(root.name) ?: "game"))
+		} else {
+			val gameChildren = (root.listFiles() ?: emptyArray()).filter {
+				it.isDirectory && findGameInfoFile(it) != null
+			}
+
+			if (gameChildren.isNotEmpty()) {
+				for (child in gameChildren) {
+					targets.add(child to File(appFiles, sanitize(child.name) ?: "game"))
+				}
+			} else {
+				targets.add(root to File(appFiles, sanitize(root.name) ?: "game"))
+			}
+		}
+
+		val colliding = targets.map { it.second }.firstOrNull { it.exists() }
+		if (colliding != null) {
+			return InstallPlan.Exists(colliding.name)
+		}
+
+		val items = mutableListOf<CopyItem>()
+		var totalBytes = 0L
+		for ((srcRoot, dest) in targets) {
+			totalBytes += collectItems(srcRoot, dest, items)
+		}
+
+		return InstallPlan.Ok(targets, items, totalBytes)
+	}
+
+	private fun appFilesDir(ctx: android.content.Context): File =
+		ctx.getExternalFilesDir(null) ?: ctx.filesDir
 
 	private fun sanitize(name: String?): String? =
 		name?.replace('/', '_')?.replace('\\', '_')?.takeIf { it.isNotBlank() }
@@ -138,57 +190,10 @@ class LibraryFragment : Fragment(), MenuProvider {
 		val ctx = requireContext()
 		val resolver = ctx.contentResolver
 
-		val root = DocumentFile.fromTreeUri(ctx, treeUri)
-		if (root == null || !root.isDirectory) {
-			MaterialAlertDialogBuilder(ctx)
-				.setTitle(R.string.install_failed_title)
-				.setMessage(getString(R.string.install_failed_message, "Could not open the selected folder."))
-				.setPositiveButton(android.R.string.ok, null)
-				.show()
-			return
-		}
-
-		// figure out what to copy where:
-		// - the picked folder is a game folder  -> copy into files/<folder>
-		// - the picked folder holds game folders -> copy each game folder into files/
-		// - anything else                        -> copy as files/<folder>
-		val appFiles = appFilesDir()
-		val targets = mutableListOf<Pair<DocumentFile, File>>()
-
-		if (findGameInfoFile(root) != null) {
-			targets.add(root to File(appFiles, sanitize(root.name) ?: "game"))
-		} else {
-			val gameChildren = (root.listFiles() ?: emptyArray()).filter {
-				it.isDirectory && findGameInfoFile(it) != null
-			}
-
-			if (gameChildren.isNotEmpty()) {
-				for (child in gameChildren) {
-					targets.add(child to File(appFiles, sanitize(child.name) ?: "game"))
-				}
-			} else {
-				targets.add(root to File(appFiles, sanitize(root.name) ?: "game"))
-			}
-		}
-
-		val colliding = targets.map { it.second }.firstOrNull { it.exists() }
-		if (colliding != null) {
-			MaterialAlertDialogBuilder(ctx)
-				.setTitle(R.string.install_exists_title)
-				.setMessage(getString(R.string.install_exists_message, colliding.name))
-				.setPositiveButton(android.R.string.ok, null)
-				.show()
-			return
-		}
-
-		val items = mutableListOf<CopyItem>()
-		var totalBytes = 0L
-		for ((srcRoot, dest) in targets) {
-			totalBytes += collectItems(srcRoot, dest, items)
-		}
-
 		var cancelled = false
 		val installBinding = DialogInstallProgressBinding.inflate(LayoutInflater.from(ctx))
+		installBinding.installProgress.isIndeterminate = true
+		installBinding.installStatus.text = getString(R.string.preparing_install)
 		val dialog = MaterialAlertDialogBuilder(ctx)
 			.setTitle(R.string.installing_game)
 			.setView(installBinding.root)
@@ -198,72 +203,129 @@ class LibraryFragment : Fragment(), MenuProvider {
 		dialog.show()
 
 		viewLifecycleOwner.lifecycleScope.launch {
-			var copiedBytes = 0L
-			var copiedFiles = 0
-			var lastUpdate = 0L
 			var failure: Throwable? = null
+			var plan: InstallPlan? = null
 
 			withContext(Dispatchers.IO) {
 				try {
-					for (item in items) {
-						if (cancelled) {
-							break
-						}
-
-						item.dest.parentFile?.mkdirs()
-						resolver.openInputStream(item.src.uri)?.use { input ->
-							FileOutputStream(item.dest).use { output ->
-								input.copyTo(output, 128 * 1024)
-							}
-						} ?: throw IllegalStateException("Could not read ${item.src.name ?: item.src.uri}")
-
-						copiedBytes += item.bytes
-						copiedFiles++
-
-						val now = System.currentTimeMillis()
-						if (now - lastUpdate > 60L || copiedFiles == items.size) {
-							lastUpdate = now
-							withContext(Dispatchers.Main) {
-								installBinding.installStatus.text =
-									getString(R.string.installing_status, item.src.name ?: "file")
-								installBinding.installDetail.text = getString(
-									R.string.installing_detail, copiedFiles, items.size,
-									copiedBytes / (1024 * 1024), totalBytes / (1024 * 1024)
-								)
-								installBinding.installProgress.progress =
-									if (totalBytes > 0) ((copiedBytes * 100) / totalBytes).toInt() else 0
-							}
-						}
-					}
+					plan = computeInstallPlan(ctx, treeUri)
 				} catch (e: Throwable) {
 					failure = e
 				}
 			}
 
-			dialog.dismiss()
+			if (failure != null) {
+				dialog.dismiss()
+				MaterialAlertDialogBuilder(ctx)
+					.setTitle(R.string.install_failed_title)
+					.setMessage(getString(R.string.install_failed_message, failure!!.message))
+					.setPositiveButton(android.R.string.ok, null)
+					.show()
+				return@launch
+			}
 
-			when {
-				failure != null -> {
-					for ((_, dest) in targets) {
-						dest.deleteRecursively()
-					}
+			when (val p = plan!!) {
+				is InstallPlan.Error -> {
+					dialog.dismiss()
 					MaterialAlertDialogBuilder(ctx)
 						.setTitle(R.string.install_failed_title)
-						.setMessage(getString(R.string.install_failed_message, failure!!.message))
+						.setMessage(getString(R.string.install_failed_message, p.message))
 						.setPositiveButton(android.R.string.ok, null)
 						.show()
-					libraryViewModel.reloadGames(ctx)
+					return@launch
 				}
-				cancelled -> {
-					for ((_, dest) in targets) {
-						dest.deleteRecursively()
+				is InstallPlan.Exists -> {
+					dialog.dismiss()
+					MaterialAlertDialogBuilder(ctx)
+						.setTitle(R.string.install_exists_title)
+						.setMessage(getString(R.string.install_exists_message, p.name))
+						.setPositiveButton(android.R.string.ok, null)
+						.show()
+					return@launch
+				}
+				is InstallPlan.Ok -> {
+					if (cancelled) {
+						dialog.dismiss()
+						Toast.makeText(ctx, R.string.install_cancelled, Toast.LENGTH_SHORT).show()
+						return@launch
 					}
-					Toast.makeText(ctx, R.string.install_cancelled, Toast.LENGTH_SHORT).show()
-					libraryViewModel.reloadGames(ctx)
-				}
-				else -> {
-					Toast.makeText(ctx, R.string.install_finished, Toast.LENGTH_SHORT).show()
-					libraryViewModel.reloadGames(ctx)
+
+					installBinding.installProgress.isIndeterminate = false
+					installBinding.installProgress.progress = 0
+
+					val targets = p.targets
+					val items = p.items
+					val totalBytes = p.totalBytes
+
+					var copiedBytes = 0L
+					var copiedFiles = 0
+					var lastUpdate = 0L
+
+					withContext(Dispatchers.IO) {
+						try {
+							for (item in items) {
+								if (cancelled) {
+									break
+								}
+
+								item.dest.parentFile?.mkdirs()
+								resolver.openInputStream(item.src.uri)?.use { input ->
+									FileOutputStream(item.dest).use { output ->
+										input.copyTo(output, 128 * 1024)
+									}
+								} ?: throw IllegalStateException("Could not read ${item.src.name ?: item.src.uri}")
+
+								copiedBytes += item.bytes
+								copiedFiles++
+
+								val now = System.currentTimeMillis()
+								if (now - lastUpdate > 60L || copiedFiles == items.size) {
+									lastUpdate = now
+									val fileName = item.src.name ?: "file"
+									val filesSoFar = copiedFiles
+									withContext(Dispatchers.Main) {
+										installBinding.installStatus.text =
+											getString(R.string.installing_status, fileName)
+										installBinding.installDetail.text = getString(
+											R.string.installing_detail, filesSoFar, items.size,
+											copiedBytes / (1024 * 1024), totalBytes / (1024 * 1024)
+										)
+										installBinding.installProgress.progress =
+											if (totalBytes > 0) ((copiedBytes * 100) / totalBytes).toInt() else 0
+									}
+								}
+							}
+						} catch (e: Throwable) {
+							failure = e
+						}
+					}
+
+					dialog.dismiss()
+
+					when {
+						failure != null -> {
+							for ((_, dest) in targets) {
+								dest.deleteRecursively()
+							}
+							MaterialAlertDialogBuilder(ctx)
+								.setTitle(R.string.install_failed_title)
+								.setMessage(getString(R.string.install_failed_message, failure!!.message))
+								.setPositiveButton(android.R.string.ok, null)
+								.show()
+							libraryViewModel.reloadGames(ctx)
+						}
+						cancelled -> {
+							for ((_, dest) in targets) {
+								dest.deleteRecursively()
+							}
+							Toast.makeText(ctx, R.string.install_cancelled, Toast.LENGTH_SHORT).show()
+							libraryViewModel.reloadGames(ctx)
+						}
+						else -> {
+							Toast.makeText(ctx, R.string.install_finished, Toast.LENGTH_SHORT).show()
+							libraryViewModel.reloadGames(ctx)
+						}
+					}
 				}
 			}
 		}
