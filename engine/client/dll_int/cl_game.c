@@ -981,6 +981,78 @@ static void CL_DrawLoadingPanel( const char *label )
 
 /*
 =============
+CL_DrawLoadingProgress
+
+the classic GoldSource loading plaque: a dark band along the bottom of the
+screen, a track with an accent fill and a centered LOADING... label.
+scr_download carries a real percentage, so the bar only shows one while a
+download runs; plain loading sweeps a block instead.
+=============
+*/
+static void CL_DrawLoadingProgress( void )
+{
+	const int sw = 640;
+	const int sh = 480;
+	const int bandH = 64;
+	const int barW = 400;
+	const int barH = 14;
+	const int barX = ( sw - barW ) / 2;
+	const int bandY = sh - bandH;
+	const int barY = bandY + bandH * 55 / 100;
+
+	const qboolean downloading = scr_download.value >= 0.0f;
+	const float percent = downloading ? bound( 0.0f, scr_download.value, 100.0f ) : 0.0f;
+
+	cl_font_t *font = CL_GetHudFont();
+	char text[64];
+
+	if( downloading ) Q_snprintf( text, sizeof( text ), "LOADING... %i%%", (int)( percent + 0.5f ));
+	else Q_strncpy( text, "LOADING...", sizeof( text ));
+
+	CL_FillRectHUD( 0, bandY, sw, bandH, 41, 44, 33, 235 );
+	CL_FillRectHUD( 0, bandY, sw, 1, 140, 146, 132, 255 );
+
+	if( font )
+	{
+		rgba_t color;
+		int textW = 0, textH = 0;
+
+		Vector4Set( color, 222, 223, 214, 255 );
+		CL_DrawStringLen( font, text, &textW, &textH, FONT_DRAW_HUD );
+		CL_DrawString( CL_AdjustXPos( -1, textW, textW ), bandY + bandH * 15 / 100,
+			text, color, font, FONT_DRAW_HUD | FONT_DRAW_UTF8 );
+	}
+
+	CL_FillRectHUD( barX, barY, barW, barH, 31, 31, 31, 255 );
+
+	int filled;
+
+	if( downloading )
+	{
+		filled = (int)( barW * ( percent / 100.0f ));
+	}
+	else
+	{
+		const int block = barW / 6;
+		const float period = 1.8f;
+		const float phase = (float)( fmod( host.realtime, period ) / period );
+
+		filled = (int)( phase * ( barW + block )) - block;
+	}
+
+	filled = bound( 0, filled, barW );
+
+	if( filled > 0 )
+		CL_FillRectHUD( barX, barY, filled, barH, 196, 181, 80, 255 );
+
+	CL_FillRectHUD( barX - 1, barY - 1, barW + 2, 1, 140, 146, 132, 255 );
+	CL_FillRectHUD( barX - 1, barY + barH, barW + 2, 1, 10, 10, 10, 255 );
+	CL_FillRectHUD( barX - 1, barY - 1, 1, barH + 2, 140, 146, 132, 255 );
+	CL_FillRectHUD( barX + barW, barY - 1, 1, barH + 2, 10, 10, 10, 255 );
+}
+
+/*
+=============
 CL_DrawLoading
 
 draw loading progress bar
@@ -1061,7 +1133,7 @@ void CL_DrawHUD( int state )
 		break;
 	case CL_LOADING:
 		if( !CL_TryClientLoadingPanel() )
-			CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
+			CL_DrawLoadingProgress();
 		break;
 	case CL_CHANGELEVEL:
 		// draw_changelevel only marks the first frame, so taking it as the
@@ -1073,7 +1145,7 @@ void CL_DrawHUD( int state )
 		if( cls.draw_changelevel || (!cl.video_prepped && !cl.background) )
 		{
 			if( !CL_TryClientLoadingPanel() )
-				CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
+				CL_DrawLoadingProgress();
 			cls.draw_changelevel = false;
 		}
 		break;
