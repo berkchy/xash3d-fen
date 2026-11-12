@@ -20,11 +20,18 @@ import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.LinkedBlockingQueue
 import su.xash.engine.R
 import su.xash.engine.adapters.GameAdapter
 import su.xash.engine.databinding.DialogInstallProgressBinding
@@ -112,8 +119,12 @@ class LibraryFragment : Fragment(), MenuProvider {
 		data class Exists(val name: String) : InstallPlan
 	}
 
+	private companion object {
+		const val WORKER_THREADS = 8
+	}
+
 	// heavy Storage Access Framework walk - must run off the UI thread
-	private fun computeInstallPlan(ctx: android.content.Context, treeUri: Uri, scanCount: AtomicLong, cancelled: AtomicBoolean): InstallPlan {
+	private suspend fun computeInstallPlan(ctx: android.content.Context, treeUri: Uri, scanCount: AtomicLong, cancelled: AtomicBoolean): InstallPlan {
 		val root = DocumentFile.fromTreeUri(ctx, treeUri)
 			?: return InstallPlan.Error("Could not open the selected folder.")
 
@@ -149,13 +160,60 @@ class LibraryFragment : Fragment(), MenuProvider {
 			return InstallPlan.Exists(colliding.name)
 		}
 
-		val items = mutableListOf<CopyItem>()
-		var totalBytes = 0L
-		for ((srcRoot, dest) in targets) {
-			totalBytes += collectItems(srcRoot, dest, items, scanCount, cancelled)
+		// parallel breadth-first walk, bounded by WORKER_THREADS workers
+		val items = Collections.synchronizedList(mutableListOf<CopyItem>())
+		val totalBytes = AtomicLong(0)
+		val queue = LinkedBlockingQueue<Pair<DocumentFile, File>>()
+		val pending = AtomicInteger(targets.size)
+
+		for ((srcRoot, destRoot) in targets) {
+			queue.put(srcRoot to destRoot)
 		}
 
-		return InstallPlan.Ok(targets, items, totalBytes)
+		coroutineScope {
+			repeat(WORKER_THREADS) {
+				launch(Dispatchers.IO) {
+					while (true) {
+						if (cancelled.get()) {
+							throw CancellationException()
+						}
+
+						val item = queue.poll()
+						if (item == null) {
+							if (pending.get() == 0) {
+								return@launch
+							}
+							delay(20)
+							continue
+						}
+
+						val (src, dest) = item
+						val children = src.listFiles() ?: emptyArray()
+						for (child in children) {
+							if (cancelled.get()) {
+								throw CancellationException()
+							}
+
+							val childDest = File(dest, sanitize(child.name) ?: "file")
+							if (child.isDirectory) {
+								pending.incrementAndGet()
+								queue.put(child to childDest)
+							} else if (child.isFile) {
+								val size = child.length()
+								synchronized(items) {
+									items.add(CopyItem(child, childDest, size))
+								}
+								totalBytes.addAndGet(size)
+								scanCount.incrementAndGet()
+							}
+						}
+						pending.decrementAndGet()
+					}
+				}
+			}
+		}
+
+		return InstallPlan.Ok(targets, synchronized(items) { ArrayList(items) }, totalBytes.get())
 	}
 
 	private fun appFilesDir(ctx: android.content.Context): File =
@@ -174,24 +232,6 @@ class LibraryFragment : Fragment(), MenuProvider {
 					it.name.equals("gameinfo.txt", ignoreCase = true)
 			)
 		}
-	}
-
-	private fun collectItems(src: DocumentFile, dest: File, sink: MutableList<CopyItem>, scanCount: AtomicLong, cancelled: AtomicBoolean): Long {
-		var totalBytes = 0L
-		if (cancelled.get()) {
-			throw CancellationException()
-		}
-		if (src.isDirectory) {
-			for (child in src.listFiles() ?: emptyArray()) {
-				totalBytes += collectItems(child, File(dest, sanitize(child.name) ?: "file"), sink, scanCount, cancelled)
-			}
-		} else if (src.isFile) {
-			val size = src.length()
-			sink.add(CopyItem(src, dest, size))
-			scanCount.incrementAndGet()
-			totalBytes += size
-		}
-		return totalBytes
 	}
 
 	private fun installGame(treeUri: Uri) {
@@ -276,62 +316,70 @@ class LibraryFragment : Fragment(), MenuProvider {
 					return@launch
 				}
 				is InstallPlan.Ok -> {
-					if (cancelled.get()) {
-						dialog.dismiss()
-						Toast.makeText(ctx, R.string.install_cancelled, Toast.LENGTH_SHORT).show()
-						return@launch
-					}
-
 					installBinding.installProgress.isIndeterminate = false
 					installBinding.installProgress.progress = 0
 
 					val targets = p.targets
 					val items = p.items
 					val totalBytes = p.totalBytes
+					val totalFiles = items.size
 
-					var copiedBytes = 0L
-					var copiedFiles = 0
-					var lastUpdate = 0L
+					val copiedBytes = AtomicLong(0)
+					val copiedFiles = AtomicLong(0)
+					val lastUpdate = AtomicLong(0)
+					val copyFailure = AtomicReference<Throwable?>(null)
 
-					withContext(Dispatchers.IO) {
-						try {
-							for (item in items) {
-								if (cancelled.get()) {
-									break
-								}
+					// parallel copy: split items into WORKER_THREADS interleaved chunks
+					val chunks = Array(WORKER_THREADS) { mutableListOf<CopyItem>() }
+					for ((i, item) in items.withIndex()) {
+						chunks[i % WORKER_THREADS].add(item)
+					}
 
-								item.dest.parentFile?.mkdirs()
-								resolver.openInputStream(item.src.uri)?.use { input ->
-									FileOutputStream(item.dest).use { output ->
-										input.copyTo(output, 128 * 1024)
+					coroutineScope {
+						val workers = chunks.map { chunk ->
+							async(Dispatchers.IO) {
+								for (item in chunk) {
+									if (cancelled.get() || copyFailure.get() != null) {
+										return@async
 									}
-								} ?: throw IllegalStateException("Could not read ${item.src.name ?: item.src.uri}")
 
-								copiedBytes += item.bytes
-								copiedFiles++
+									try {
+										item.dest.parentFile?.mkdirs()
+										resolver.openInputStream(item.src.uri)?.use { input ->
+											FileOutputStream(item.dest).use { output ->
+												input.copyTo(output, 1024 * 1024)
+											}
+										} ?: throw IllegalStateException("Could not read ${item.src.name ?: item.src.uri}")
 
-								val now = System.currentTimeMillis()
-								if (now - lastUpdate > 60L || copiedFiles == items.size) {
-									lastUpdate = now
-									val fileName = item.src.name ?: "file"
-									val filesSoFar = copiedFiles
-									withContext(Dispatchers.Main) {
-										installBinding.installStatus.text =
-											getString(R.string.installing_status, fileName)
-										installBinding.installDetail.text = getString(
-											R.string.installing_detail, filesSoFar, items.size,
-											copiedBytes / (1024 * 1024), totalBytes / (1024 * 1024)
-										)
-										installBinding.installProgress.progress =
-											if (totalBytes > 0) ((copiedBytes * 100) / totalBytes).toInt() else 0
+										val bytes = copiedBytes.addAndGet(item.bytes)
+										val files = copiedFiles.incrementAndGet()
+
+										val now = System.currentTimeMillis()
+										if (now - lastUpdate.get() > 60L || files == totalFiles.toLong()) {
+											lastUpdate.set(now)
+											val fileName = item.src.name ?: "file"
+											withContext(Dispatchers.Main) {
+												installBinding.installStatus.text =
+													getString(R.string.installing_status, fileName)
+												installBinding.installDetail.text = getString(
+													R.string.installing_detail, files.toInt(), totalFiles,
+													bytes / (1024 * 1024), totalBytes / (1024 * 1024)
+												)
+												installBinding.installProgress.progress =
+													if (totalBytes > 0) ((bytes * 100) / totalBytes).toInt() else 0
+											}
+										}
+									} catch (e: Throwable) {
+										copyFailure.compareAndSet(null, e)
+										return@async
 									}
 								}
 							}
-						} catch (e: Throwable) {
-							failure = e
 						}
+						workers.awaitAll()
 					}
 
+					failure = copyFailure.get()
 					dialog.dismiss()
 
 					when {
