@@ -333,6 +333,8 @@ typedef struct
 	pfnEventHook	func;	// user-defined function
 } cl_user_event_t;
 
+#define DRC_CMD_MESSAGE		6 // svc_director sub command: director HUD message
+
 #define FONT_FIXED      0
 #define FONT_VARIABLE   1
 
@@ -863,6 +865,8 @@ void CL_DrawCenterPrint( void );
 void CL_ClearSpriteTextures( void );
 void CL_HudMessage( const char *pMessage );
 void CL_CenterPrint( const char *text, float y );
+void CL_DirectorMessage_Store( const byte *pbuf, int iSize );
+void CL_DrawDirectorMessages( void );
 client_textmessage_t *CL_TextMessageGet( const char *pName );
 void NetAPI_CancelAllRequests( void );
 model_t *CL_LoadClientSprite( const char *filename );
