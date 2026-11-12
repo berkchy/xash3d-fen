@@ -62,6 +62,8 @@ CVAR_DEFINE_AUTO( cl_smoothtime, "0.1", 0, "time to smooth up" );
 CVAR_DEFINE_AUTO( cl_clockreset, "0.1", 0, "frametime delta maximum value before reset" );
 static CVAR_DEFINE_AUTO( cl_fixtimerate, "7.5", 0, "time in msec to client clock adjusting" );
 CVAR_DEFINE_AUTO( hud_fontscale, "1.0", FCVAR_ARCHIVE|FCVAR_LATCH, "scale hud font texture" );
+CVAR_DEFINE_AUTO( dhud_scale, "1.35", FCVAR_ARCHIVE, "director HUD font scale" );
+CVAR_DEFINE_AUTO( dhud_spacing, "0", FCVAR_ARCHIVE, "director HUD letter spacing in whole pixels" );
 CVAR_DEFINE_AUTO( hud_fontrender, "0", FCVAR_ARCHIVE, "hud font render mode (0: additive, 1: holes, 2: trans)" );
 CVAR_DEFINE_AUTO( hud_scale, "0", FCVAR_ARCHIVE|FCVAR_LATCH, "scale hud at current resolution" );
 CVAR_DEFINE_AUTO( hud_scale_minimal_width, "640", FCVAR_ARCHIVE|FCVAR_LATCH, "if hud_scale results in a HUD virtual screen smaller than this value, it won't be applied" );
@@ -3664,6 +3666,8 @@ static void CL_InitLocal( void )
 	Cvar_RegisterVariable( &cl_clockreset );
 	Cvar_RegisterVariable( &cl_fixtimerate );
 	Cvar_RegisterVariable( &hud_fontscale );
+	Cvar_RegisterVariable( &dhud_scale );
+	Cvar_RegisterVariable( &dhud_spacing );
 	Cvar_RegisterVariable( &hud_fontrender );
 	Cvar_RegisterVariable( &hud_scale );
 	Cvar_RegisterVariable( &hud_scale_minimal_width );
