@@ -468,22 +468,62 @@ void SCR_MakeScreenShot( void )
 
 /*
 ================
+SCR_DrawBackdropGradient
+
+never-black loading backdrop: the same 0x2A3140 -> 0x14181F vertical
+gradient the Android loading view falls back to. Painted during the load
+so the screen can never show an empty black frame.
+================
+*/
+static void SCR_DrawBackdropGradient( void )
+{
+	int	i, bands = 48;
+	int	bandH = ( refState.height + bands - 1 ) / bands;
+
+	for( i = 0; i < bands; i++ )
+	{
+		float	t = (float)i / (float)( bands - 1 );
+		int	y = i * bandH;
+		int	h = Q_min( bandH, refState.height - y );
+		byte	r = (byte)( 0x2A + (( 0x14 - 0x2A ) * t ));
+		byte	g = (byte)( 0x31 + (( 0x18 - 0x31 ) * t ));
+		byte	b = (byte)( 0x40 + (( 0x1F - 0x40 ) * t ));
+
+		ref.dllFuncs.FillRGBA( kRenderTransTexture, 0, y, refState.width, h, r, g, b, 255 );
+	}
+}
+
+/*
+================
 SCR_DrawPlaque
 ================
 */
 static qboolean SCR_DrawPlaque( void )
 {
+	int	levelshot = 0;
+
+	// always draw the loading screen; without a mod-provided levelshot the
+	// name is forced to "*black", so skip loading that and paint the gradient
 	if(( cl_allow_levelshots.value && !cls.changelevel ) || cl.background )
+		if( Q_stricmp( cl_levelshot_name.string, "*black" ))
+			levelshot = ref.dllFuncs.GL_LoadTexture( cl_levelshot_name.string, NULL, 0, TF_IMAGE );
+
+	if( levelshot )
 	{
-		int levelshot = ref.dllFuncs.GL_LoadTexture( cl_levelshot_name.string, NULL, 0, TF_IMAGE );
 		ref.dllFuncs.GL_SetRenderMode( kRenderNormal );
 		ref.dllFuncs.R_DrawStretchPic( 0, 0, refState.width, refState.height, 0, 0, 1, 1, levelshot );
-		if( !cl.background ) CL_DrawHUD( CL_LOADING );
-
-		return true;
+	}
+	else
+	{
+		SCR_DrawBackdropGradient();
 	}
 
-	return false;
+	// the bottom LOADING band is reserved for background-map sessions and
+	// demo playback, where no dialog is raised at all
+	if( cl.background || cls.demoplayback )
+		CL_DrawHUD( CL_LOADING );
+
+	return true;
 }
 
 /*
@@ -509,6 +549,21 @@ void SCR_BeginLoadingPlaque( qboolean is_background )
 	if( cls.key_dest == key_console )
 		return;
 
+	// raise the GameUI loading dialog (the GoldSource "Loading..." box with
+	// status line and segmented bar); a remote session is identified by
+	// connect_time (CL_Connect_f latches it before calling here)
+	if( !is_background && !cls.demoplayback )
+	{
+		if( cls.connect_time != 0.0f && cls.servername[0] )
+			UI_ConnectionProgress_Connect( cls.servername );
+		else UI_ConnectionProgress_Connect( NULL );
+
+		// key_menu so taps and ESC reach the dialog's Cancel/Esc while the
+		// load runs (an open console keeps its key_dest untouched)
+		if( cls.key_dest != key_console )
+			Key_SetKeyDest( key_menu );
+	}
+
 	if( is_background ) IN_MouseSavePos( );
 	cls.draw_changelevel = !is_background;
 	SCR_UpdateScreen();
@@ -529,6 +584,15 @@ SCR_EndLoadingPlaque
 void SCR_EndLoadingPlaque( void )
 {
 	cls.disable_screen = 0.0f;
+
+	// close the GameUI loading dialog that SCR_BeginLoadingPlaque raised;
+	// land key_dest on the game so input works right after the load
+	if( !cl.background )
+	{
+		UI_ConnectionProgress_Disconnect();
+		UI_SetActiveMenu( false );
+	}
+
 	Con_ClearNotify();
 //	SNDDMA_UnlockSound();
 }

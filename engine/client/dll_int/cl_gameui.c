@@ -283,6 +283,14 @@ void UI_ConnectionProgress_ParseServerInfo( const char *server )
 	}
 }
 
+void UI_ConnectionProgress_StuffText( float flProgress, const char *pszText )
+{
+	if( gameui.dllFuncs2.pfnConnectionProgress_StuffText )
+	{
+		gameui.dllFuncs2.pfnConnectionProgress_StuffText( flProgress, pszText );
+	}
+}
+
 static void GAME_EXPORT UI_DrawLogo( const char *filename, float x, float y, float width, float height )
 {
 	movie_state_t	*cin_state;

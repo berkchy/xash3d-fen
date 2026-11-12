@@ -3289,9 +3289,88 @@ static qboolean CL_ShouldRescanFilesystem( void )
 	return retval;
 }
 
+/*
+===============
+CL_LoadingPhaseText
+
+one phase sentence for the loading dialog status line, matched to what the
+engine is actually doing at this point of the load
+===============
+*/
+static const char *CL_LoadingPhaseText( void )
+{
+	if( scr_download.value >= 0.0f )
+		return "Verifying and downloading resources...";
+	if( cls.signon > 0 )
+		return "Precaching resources...";
+	if( cls.connect_time != 0.0f )
+		return "Establishing connection...";
+	return "Starting local game server...";
+}
+
+/*
+===============
+CL_PrecacheProgress
+
+scr_loading runs 10..98 across the resource precache. The dialog shows the
+same phase text the engine feeds it through UI_ConnectionProgress_StuffText;
+redraws are throttled, we're inside the signon state so only the loading
+dialog gets drawn, and the plaque latch is re-set so Con_DrawConsole never
+unveils the console over the dialog.
+===============
+*/
+static void CL_PrecacheProgress( int done, int total )
+{
+	static double	last_draw = 0.0;
+	double		now;
+
+	Cvar_SetValue( "scr_loading",
+		10.0f + 88.0f * bound( 0, done, Q_max( 1, total )) / (float)Q_max( 1, total ));
+
+	now = Platform_DoubleTime();
+
+	if( cls.state != ca_active && ( now - last_draw ) >= 0.05 )
+	{
+		float pct = scr_loading.value;
+
+		last_draw = now;
+
+		if( scr_download.value >= 0.0f && scr_download.value > pct )
+			pct = scr_download.value;
+
+		UI_ConnectionProgress_StuffText( bound( 0.0f, pct * 0.01f, 1.0f ),
+			CL_LoadingPhaseText( ));
+
+		cls.disable_screen = host.realtime;
+
+		SCR_UpdateScreen();
+	}
+}
+
 qboolean CL_PrecacheResources( void )
 {
 	resource_t	*pRes;
+	int		totalRes = 0, doneRes = 0;
+
+	// svc_serverdata closes the menu stack mid-load, so re-raise the loading
+	// dialog for the (long) precache phase; no-op when it is already up
+	if( !cl.background && !cls.demoplayback && !UI_IsVisible())
+	{
+		if( cls.connect_time != 0.0f && cls.servername[0] )
+			UI_ConnectionProgress_Connect( cls.servername );
+		else UI_ConnectionProgress_Connect( NULL );
+
+		if( cls.key_dest != key_console )
+			Key_SetKeyDest( key_menu );
+	}
+
+	// count resources left so the loading dialog can show honest progress
+	for( pRes = cl.resourcesonhand.pNext; pRes && pRes != &cl.resourcesonhand; pRes = pRes->pNext )
+	{
+		if( !FBitSet( pRes->ucFlags, RES_PRECACHED ))
+			totalRes++;
+	}
+	CL_PrecacheProgress( 0, totalRes );
 
 	// if we downloaded new WAD files or any other archives they must be added to searchpath
 	if( CL_ShouldRescanFilesystem( ))
@@ -3309,6 +3388,7 @@ qboolean CL_PrecacheResources( void )
 		cl.models[pRes->nIndex] = Mod_LoadWorld( pRes->szFileName, true );
 		SetBits( pRes->ucFlags, RES_PRECACHED );
 		cl.nummodels = 1;
+		CL_PrecacheProgress( ++doneRes, totalRes );
 		break;
 	}
 
@@ -3431,6 +3511,7 @@ qboolean CL_PrecacheResources( void )
 		}
 
 		SetBits( pRes->ucFlags, RES_PRECACHED );
+		CL_PrecacheProgress( ++doneRes, totalRes );
 	}
 
 	// make sure modelcount is in-range

@@ -248,6 +248,9 @@ typedef struct
 	void (*pfnConnectionProgress_Connect)( const char *server ); // NULL for local server
 	void (*pfnConnectionProgress_ChangeLevel)( void );
 	void (*pfnConnectionProgress_ParseServerInfo)( const char *server );
+	// the per-frame load-phase feed; APPENDED so older menu DLLs keep their
+	// field layout, the engine memsets the table and NULL-guards the calls
+	void (*pfnConnectionProgress_StuffText)( float flProgress, const char *pszText );
 } UI_EXTENDED_FUNCTIONS;
 
 typedef int (*MENUAPI)( UI_FUNCTIONS *pFunctionTable, ui_enginefuncs_t* engfuncs, ui_globalvars_t *pGlobals );
