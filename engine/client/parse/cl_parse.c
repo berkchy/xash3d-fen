@@ -1988,6 +1988,16 @@ static void CL_ParseDirector( sizebuf_t *msg )
 
 	// parse user message into buffer
 	MSG_ReadBytes( msg, pbuf, sizeof( pbuf ), iSize );
+
+	// the engine consumes DRC_CMD_MESSAGE itself so director HUD messages
+	// render bolder and bigger than a plain HudText like in Steam CS;
+	// everything else goes to the client as usual
+	if( pbuf[0] == DRC_CMD_MESSAGE )
+	{
+		CL_DirectorMessage_Store( pbuf, iSize );
+		return;
+	}
+
 	clgame.dllFuncs.pfnDirectorMessage( iSize, pbuf );
 }
 
