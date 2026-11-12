@@ -15,7 +15,6 @@ frame with a credits font scaled 1.2x.
 
 #define DRC_CMD_MESSAGE	6
 #define MAX_DHUD_MESSAGES	8
-#define DHUD_FONT_SCALE	1.2f
 
 
 typedef struct
@@ -35,7 +34,10 @@ static qboolean s_scaled_valid;
 
 static void CL_DHUD_BuildscaledFont( void )
 {
-	if( s_scaled_valid && s_scaled_font.hFontTexture == cls.creditsFont.hFontTexture )
+	static float builtScale = -1.0f;
+
+	if( s_scaled_valid && s_scaled_font.hFontTexture == cls.creditsFont.hFontTexture
+		&& builtScale == dhud_scale.value )
 		return;
 
 	s_scaled_font = cls.creditsFont;
@@ -46,13 +48,14 @@ static void CL_DHUD_BuildscaledFont( void )
 		return;
 	}
 
-	s_scaled_font.scale *= DHUD_FONT_SCALE;
-	s_scaled_font.charHeight = (int)( s_scaled_font.charHeight * DHUD_FONT_SCALE );
+	s_scaled_font.scale *= dhud_scale.value;
+	s_scaled_font.charHeight = (int)( s_scaled_font.charHeight * dhud_scale.value );
 
 	for( int i = 0; i < ARRAYSIZE( s_scaled_font.charWidths ); i++ )
-		s_scaled_font.charWidths[i] = (byte)bound( 0, (int)( s_scaled_font.charWidths[i] * DHUD_FONT_SCALE ), 255 );
+		s_scaled_font.charWidths[i] = (byte)bound( 0, (int)( s_scaled_font.charWidths[i] * dhud_scale.value ), 255 );
 
 	s_scaled_valid = true;
+	builtScale = dhud_scale.value;
 }
 
 void CL_DirectorMessage_Store( const byte *pbuf, int iSize )
@@ -230,12 +233,43 @@ static int CL_DHUD_XPos( float xfrac, int sw, int width )
 	return xpos;
 }
 
+static int CL_DHUD_LineWidth( cl_font_t *font, const char *text )
+{
+	int width = 0;
+	const char *s = text;
+
+	Con_UtfProcessChar( 0 );
+
+	while( *s )
+	{
+		int uch = Con_UtfProcessChar( (byte)*s );
+
+		s++;
+
+		if( !uch ) continue;
+
+		width += font->charWidths[uch];
+		if( dhud_spacing.value != 0.0f )
+			width += (int)dhud_spacing.value;
+	}
+
+	// drop the trailing spacer
+	{
+		float sp = dhud_spacing.value;
+
+		if( sp > 0.0f && width >= (int)sp )
+			width -= (int)sp;
+	}
+
+	return width;
+}
+
 static void CL_DHUD_DrawLine( const char *line, int lineLen, int codepointBudget,
 	int sw, float xfrac, int y, const rgba_t color, cl_font_t *font )
 {
 	static char buf[256];
 	const char *draw = line;
-	int width = 0;
+	int width = 0, xpos, stripAdvance;
 
 	if( codepointBudget >= 0 )
 	{
@@ -249,13 +283,26 @@ static void CL_DHUD_DrawLine( const char *line, int lineLen, int codepointBudget
 		draw = buf;
 	}
 
-	CL_DrawStringLen( font, draw, &width, NULL, FONT_DRAW_HUD | FONT_DRAW_UTF8 );
+	width = CL_DHUD_LineWidth( font, draw );
+	xpos = CL_DHUD_XPos( xfrac, sw, width );
 
-	int xpos = CL_DHUD_XPos( xfrac, sw, width );
+	Con_UtfProcessChar( 0 );
 
-	// double strike with 1px horizontal offset for a bold look
-	CL_DrawString( xpos, y, draw, color, font, FONT_DRAW_HUD | FONT_DRAW_UTF8 );
-	CL_DrawString( xpos + 1, y, draw, color, font, FONT_DRAW_HUD | FONT_DRAW_UTF8 );
+	for( const char *s = draw; *s; s++ )
+	{
+		int uch = Con_UtfProcessChar( (byte)*s );
+
+		if( !uch ) continue;
+
+		stripAdvance = font->charWidths[uch] + (int)dhud_spacing.value;
+
+		// triple strike with 1px horizontal offsets for a bold look
+		CL_DrawCharacter( xpos, y, uch, color, font, FONT_DRAW_HUD );
+		CL_DrawCharacter( xpos + 1, y, uch, color, font, FONT_DRAW_HUD );
+		CL_DrawCharacter( xpos + 2, y, uch, color, font, FONT_DRAW_HUD );
+
+		xpos += stripAdvance;
+	}
 }
 
 void CL_DrawDirectorMessages( void )

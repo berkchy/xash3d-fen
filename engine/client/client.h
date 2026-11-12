@@ -714,6 +714,8 @@ extern convar_t	cl_levelshot_name;
 extern convar_t	cl_draw_beams;
 extern convar_t	cl_clockreset;
 extern convar_t	hud_fontscale;
+extern convar_t	dhud_scale;
+extern convar_t	dhud_spacing;
 extern convar_t hud_fontrender;
 extern convar_t	hud_scale;
 extern convar_t hud_scale_minimal_width;
