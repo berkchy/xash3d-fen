@@ -351,7 +351,7 @@ qboolean Con_LoadTTFFont( const char *fontname, const char *texname, cl_font_t *
 	memset( &pic, 0, sizeof( pic ));
 	pic.width = atlasW;
 	pic.height = atlasH;
-	pic.depth = 4;
+	pic.depth = 1;
 	pic.type = PF_RGBA_32;
 	pic.flags = IMAGE_HAS_COLOR|IMAGE_HAS_ALPHA;
 	pic.buffer = atlas;
