@@ -68,6 +68,7 @@
 	<string name="install_game">Install game</string>
 	<string name="installing_game">Installing game…</string>
 	<string name="preparing_install">Preparing…</string>
+	<string name="preparing_install_progress">Scanning… %1$d files · %2$ds</string>
 	<string name="installing_status">Copying %1$s</string>
 	<string name="installing_detail">%1$d/%2$d files · %3$d MB / %4$d MB</string>
 	<string name="install_cancel">Cancel</string>

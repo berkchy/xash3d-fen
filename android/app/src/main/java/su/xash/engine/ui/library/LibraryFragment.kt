@@ -19,8 +19,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import su.xash.engine.R
 import su.xash.engine.adapters.GameAdapter
 import su.xash.engine.databinding.DialogInstallProgressBinding
@@ -109,7 +113,7 @@ class LibraryFragment : Fragment(), MenuProvider {
 	}
 
 	// heavy Storage Access Framework walk - must run off the UI thread
-	private fun computeInstallPlan(ctx: android.content.Context, treeUri: Uri): InstallPlan {
+	private fun computeInstallPlan(ctx: android.content.Context, treeUri: Uri, scanCount: AtomicLong, cancelled: AtomicBoolean): InstallPlan {
 		val root = DocumentFile.fromTreeUri(ctx, treeUri)
 			?: return InstallPlan.Error("Could not open the selected folder.")
 
@@ -148,7 +152,7 @@ class LibraryFragment : Fragment(), MenuProvider {
 		val items = mutableListOf<CopyItem>()
 		var totalBytes = 0L
 		for ((srcRoot, dest) in targets) {
-			totalBytes += collectItems(srcRoot, dest, items)
+			totalBytes += collectItems(srcRoot, dest, items, scanCount, cancelled)
 		}
 
 		return InstallPlan.Ok(targets, items, totalBytes)
@@ -172,15 +176,19 @@ class LibraryFragment : Fragment(), MenuProvider {
 		}
 	}
 
-	private fun collectItems(src: DocumentFile, dest: File, sink: MutableList<CopyItem>): Long {
+	private fun collectItems(src: DocumentFile, dest: File, sink: MutableList<CopyItem>, scanCount: AtomicLong, cancelled: AtomicBoolean): Long {
 		var totalBytes = 0L
+		if (cancelled.get()) {
+			throw CancellationException()
+		}
 		if (src.isDirectory) {
 			for (child in src.listFiles() ?: emptyArray()) {
-				totalBytes += collectItems(child, File(dest, sanitize(child.name) ?: "file"), sink)
+				totalBytes += collectItems(child, File(dest, sanitize(child.name) ?: "file"), sink, scanCount, cancelled)
 			}
 		} else if (src.isFile) {
 			val size = src.length()
 			sink.add(CopyItem(src, dest, size))
+			scanCount.incrementAndGet()
 			totalBytes += size
 		}
 		return totalBytes
@@ -190,7 +198,7 @@ class LibraryFragment : Fragment(), MenuProvider {
 		val ctx = requireContext()
 		val resolver = ctx.contentResolver
 
-		var cancelled = false
+		val cancelled = AtomicBoolean(false)
 		val installBinding = DialogInstallProgressBinding.inflate(LayoutInflater.from(ctx))
 		installBinding.installProgress.isIndeterminate = true
 		installBinding.installStatus.text = getString(R.string.preparing_install)
@@ -198,20 +206,44 @@ class LibraryFragment : Fragment(), MenuProvider {
 			.setTitle(R.string.installing_game)
 			.setView(installBinding.root)
 			.setCancelable(false)
-			.setNegativeButton(R.string.install_cancel) { _, _ -> cancelled = true }
+			.setNegativeButton(R.string.install_cancel) { _, _ -> cancelled.set(true) }
 			.create()
 		dialog.show()
 
-		viewLifecycleOwner.lifecycleScope.launch {
+		val scanCount = AtomicLong(0)
+		val startedAt = System.currentTimeMillis()
+		// live scan counter so the dialog never looks frozen
+		val ticker = requireActivity().lifecycleScope.launch {
+			while (true) {
+				delay(500)
+				installBinding.installStatus.text = getString(
+					R.string.preparing_install_progress,
+					scanCount.get(),
+					(System.currentTimeMillis() - startedAt) / 1000
+				)
+			}
+		}
+
+		// activity scope: survives fragment view destruction/recreation
+		requireActivity().lifecycleScope.launch {
 			var failure: Throwable? = null
 			var plan: InstallPlan? = null
 
 			withContext(Dispatchers.IO) {
 				try {
-					plan = computeInstallPlan(ctx, treeUri)
+					plan = computeInstallPlan(ctx, treeUri, scanCount, cancelled)
+				} catch (e: CancellationException) {
+					// user cancelled during scanning
 				} catch (e: Throwable) {
 					failure = e
 				}
+			}
+			ticker.cancel()
+
+			if (cancelled.get()) {
+				dialog.dismiss()
+				Toast.makeText(ctx, R.string.install_cancelled, Toast.LENGTH_SHORT).show()
+				return@launch
 			}
 
 			if (failure != null) {
@@ -244,7 +276,7 @@ class LibraryFragment : Fragment(), MenuProvider {
 					return@launch
 				}
 				is InstallPlan.Ok -> {
-					if (cancelled) {
+					if (cancelled.get()) {
 						dialog.dismiss()
 						Toast.makeText(ctx, R.string.install_cancelled, Toast.LENGTH_SHORT).show()
 						return@launch
@@ -264,7 +296,7 @@ class LibraryFragment : Fragment(), MenuProvider {
 					withContext(Dispatchers.IO) {
 						try {
 							for (item in items) {
-								if (cancelled) {
+								if (cancelled.get()) {
 									break
 								}
 
@@ -314,7 +346,7 @@ class LibraryFragment : Fragment(), MenuProvider {
 								.show()
 							libraryViewModel.reloadGames(ctx)
 						}
-						cancelled -> {
+						cancelled.get() -> {
 							for ((_, dest) in targets) {
 								dest.deleteRecursively()
 							}
