@@ -3356,7 +3356,7 @@ qboolean CL_PrecacheResources( void )
 
 	// svc_serverdata closes the menu stack mid-load, so re-raise the loading
 	// dialog for the (long) precache phase; no-op when it is already up
-	if( !cl.background && !cls.demoplayback && !UI_IsVisible())
+	if( UI_HasLoadingDialog() && !cl.background && !cls.demoplayback && !UI_IsVisible())
 	{
 		if( cls.connect_time != 0.0f && cls.servername[0] )
 			UI_ConnectionProgress_Connect( cls.servername );

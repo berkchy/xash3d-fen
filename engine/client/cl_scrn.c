@@ -518,9 +518,9 @@ static qboolean SCR_DrawPlaque( void )
 		SCR_DrawBackdropGradient();
 	}
 
-	// the bottom LOADING band is reserved for background-map sessions and
-	// demo playback, where no dialog is raised at all
-	if( cl.background || cls.demoplayback )
+	// the bottom LOADING band shows for background-map sessions, demo
+	// playback, and when the client menu has no loading dialog
+	if( cl.background || cls.demoplayback || !UI_HasLoadingDialog() )
 		CL_DrawHUD( CL_LOADING );
 
 	return true;
@@ -552,7 +552,7 @@ void SCR_BeginLoadingPlaque( qboolean is_background )
 	// raise the GameUI loading dialog (the GoldSource "Loading..." box with
 	// status line and segmented bar); a remote session is identified by
 	// connect_time (CL_Connect_f latches it before calling here)
-	if( !is_background && !cls.demoplayback )
+	if( !is_background && !cls.demoplayback && UI_HasLoadingDialog() )
 	{
 		if( cls.connect_time != 0.0f && cls.servername[0] )
 			UI_ConnectionProgress_Connect( cls.servername );

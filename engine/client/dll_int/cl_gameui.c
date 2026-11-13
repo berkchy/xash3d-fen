@@ -283,6 +283,11 @@ void UI_ConnectionProgress_ParseServerInfo( const char *server )
 	}
 }
 
+qboolean UI_HasLoadingDialog( void )
+{
+	return gameui.dllFuncs2.pfnConnectionProgress_Connect ? true : false;
+}
+
 void UI_ConnectionProgress_StuffText( float flProgress, const char *pszText )
 {
 	if( gameui.dllFuncs2.pfnConnectionProgress_StuffText )

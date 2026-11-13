@@ -1132,10 +1132,9 @@ void CL_DrawHUD( int state )
 		}
 		break;
 	case CL_LOADING:
-		// the GameUI loading dialog is the loading view; the bottom LOADING
-		// band only shows for background-map sessions and demo playback,
-		// where no dialog is raised at all
-		if( cl.background || cls.demoplayback )
+		// the GameUI loading dialog is the loading view when the client
+		// provides one; otherwise the engine plaque is drawn
+		if( cl.background || cls.demoplayback || !UI_HasLoadingDialog() )
 		{
 			if( !CL_TryClientLoadingPanel() )
 				CL_DrawLoadingProgress();
@@ -1150,7 +1149,7 @@ void CL_DrawHUD( int state )
 		// its own flag, since that one must not take over the screen.
 		if( cls.draw_changelevel || (!cl.video_prepped && !cl.background) )
 		{
-			if( ( cl.background || cls.demoplayback ) && !CL_TryClientLoadingPanel() )
+			if( ( cl.background || cls.demoplayback || !UI_HasLoadingDialog() ) && !CL_TryClientLoadingPanel() )
 				CL_DrawLoadingProgress();
 			cls.draw_changelevel = false;
 		}
