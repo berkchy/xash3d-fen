@@ -132,6 +132,7 @@ typedef struct
 	// console fonts
 	cl_font_t		chars[CON_NUMFONTS];// fonts.wad/font1.fnt
 	cl_font_t		*curFont;
+	cl_font_t		menuFont;		// fixed bitmap metrics for the menu/ingame UI
 
 	// console input
 	field_t		input;
@@ -586,6 +587,46 @@ Con_LoadConsoleFont
 INTERNAL RESOURCE
 ================
 */
+static qboolean Con_LoadBitmapConsoleFont( int fontNumber, cl_font_t *font, float scale )
+{
+	qboolean success = false;
+
+	if( con_oldfont.value )
+	{
+		success = Con_LoadVariableWidthFont( "gfx/conchars.fnt", font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
+	}
+	else
+	{
+		string path;
+		dword crc = 0;
+
+		// replace default fonts.wad textures by current charset's font
+		if( !CRC32_File( &crc, "fonts.wad" ) || crc == 0x3c0a0029 )
+		{
+			if( Q_snprintf( path, sizeof( path ),
+				"font%i_%s.fnt", fontNumber, Cvar_VariableString( "con_charset" )) > 0 )
+			{
+				success = Con_LoadVariableWidthFont( path, font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
+			}
+		}
+
+		if( !success )
+		{
+			Q_snprintf( path, sizeof( path ), "fonts/font%i", fontNumber );
+			success = Con_LoadVariableWidthFont( path, font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
+		}
+	}
+
+	if( !success )
+	{
+		// quake fixed font as fallback
+		// keep source to print directly into conback image
+		if( !Con_LoadFixedWidthFont( "gfx/conchars", font, scale, &con_fontrender, TF_FONT|TF_NEAREST|TF_KEEP_SOURCE ))
+			Con_DPrintf( S_ERROR "failed to load console font\n" );
+	}
+	return success;
+}
+
 static void Con_LoadConsoleFont( int fontNumber, cl_font_t *font )
 {
 	qboolean success = false;
@@ -606,41 +647,7 @@ static void Con_LoadConsoleFont( int fontNumber, cl_font_t *font )
 	}
 
 	if( !success )
-	{
-		if( con_oldfont.value )
-		{
-			success = Con_LoadVariableWidthFont( "gfx/conchars.fnt", font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
-		}
-		else
-		{
-			string path;
-			dword crc = 0;
-
-			// replace default fonts.wad textures by current charset's font
-			if( !CRC32_File( &crc, "fonts.wad" ) || crc == 0x3c0a0029 )
-			{
-				if( Q_snprintf( path, sizeof( path ),
-					"font%i_%s.fnt", fontNumber, Cvar_VariableString( "con_charset" )) > 0 )
-				{
-					success = Con_LoadVariableWidthFont( path, font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
-				}
-			}
-
-			if( !success )
-			{
-				Q_snprintf( path, sizeof( path ), "fonts/font%i", fontNumber );
-				success = Con_LoadVariableWidthFont( path, font, scale, &con_fontrender, TF_FONT|TF_NEAREST );
-			}
-		}
-	}
-
-	if( !success )
-	{
-		// quake fixed font as fallback
-		// keep source to print directly into conback image
-		if( !Con_LoadFixedWidthFont( "gfx/conchars", font, scale, &con_fontrender, TF_FONT|TF_NEAREST|TF_KEEP_SOURCE ))
-			Con_DPrintf( S_ERROR "failed to load console font\n" );
-	}
+		success = Con_LoadBitmapConsoleFont( fontNumber, font, scale );
 }
 
 /*
@@ -669,6 +676,11 @@ static void Con_LoadConchars( void )
 
 	// sets the current font
 	con.curFont = &con.chars[fontSize];
+
+	// the menu and the game UI lay out rows assuming small bitmap metrics;
+	// con_font_ttf must not change those, so keep a dedicated bitmap face
+	if( !con.menuFont.valid )
+		Con_LoadBitmapConsoleFont( 0, &con.menuFont, 1.0f );
 }
 
 /*
@@ -792,6 +804,18 @@ Con_GetCurFont
 cl_font_t *Con_GetCurFont( void )
 {
 	return con.curFont;
+}
+
+/*
+====================
+Con_GetMenuFont
+
+fixed-metric bitmap font used by the menu and in-game UI exports
+====================
+*/
+cl_font_t *Con_GetMenuFont( void )
+{
+	return &con.menuFont;
 }
 
 /*

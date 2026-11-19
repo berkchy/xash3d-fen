@@ -1138,6 +1138,7 @@ int Con_UtfMoveLeft( char *str, int pos );
 int Con_UtfMoveRight( char *str, int pos, int length );
 void Con_DefaultColor( int r, int g, int b, qboolean gameui );
 cl_font_t *Con_GetCurFont( void );
+cl_font_t *Con_GetMenuFont( void );
 cl_font_t *Con_GetFont( int num );
 
 // Drawing bridge for the engine-side VGUI2 in client/vgui/vgui2, which is
