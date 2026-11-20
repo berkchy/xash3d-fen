@@ -2069,22 +2069,37 @@ static void CL_ParseStatusMessage( netadr_t from, sizebuf_t *msg )
 	int numcl, maxcl, i;
 
 	if( !Info_IsValid( s ))
+	{
+		Con_Printf( "ServerBrowser: %s info rejected (invalid infostring)\n", NET_AdrToString( from ));
 		return;
+	}
 
 	CL_FixupColorStringsForInfoString( s, infostring, sizeof( infostring ));
 
 	if( COM_StringEmptyOrNULL( Info_ValueForKey( infostring, "gamedir" )))
+	{
+		Con_Printf( "ServerBrowser: %s info rejected (no gamedir)\n", NET_AdrToString( from ));
 		return; // unsupported proto
+	}
 
 	if( COM_StringEmptyOrNULL( Info_ValueForKey( infostring, "host" )))
+	{
+		Con_Printf( "ServerBrowser: %s info rejected (no host)\n", NET_AdrToString( from ));
 		return;
+	}
 
 	if( COM_StringEmptyOrNULL( Info_ValueForKey( infostring, "map" )))
+	{
+		Con_Printf( "ServerBrowser: %s info rejected (no map)\n", NET_AdrToString( from ));
 		return;
+	}
 
 	// don't let servers pretend they're something else
 	if( !COM_StringEmptyOrNULL( Info_ValueForKey( infostring, "gs" )))
+	{
+		Con_Printf( "ServerBrowser: %s info rejected (fake gs)\n", NET_AdrToString( from ));
 		return;
+	}
 
 	maxcl = Q_atoi( Info_ValueForKey( infostring, "maxcl" ));
 	numcl = Q_atoi( Info_ValueForKey( infostring, "numcl" ));
@@ -2092,8 +2107,13 @@ static void CL_ParseStatusMessage( netadr_t from, sizebuf_t *msg )
 
 	// sanity check
 	if( maxcl > MAX_CLIENTS || numcl > MAX_CLIENTS || numcl > maxcl || i != PROTOCOL_VERSION )
+	{
+		Con_Printf( "ServerBrowser: %s info rejected (sanity: maxcl=%d numcl=%d proto=%d)\n",
+			NET_AdrToString( from ), maxcl, numcl, i );
 		return;
+	}
 
+	Con_Printf( "ServerBrowser: %s info accepted\n", NET_AdrToString( from ));
 	UI_AddServerToList( from, infostring );
 }
 
@@ -2653,6 +2673,8 @@ static void CL_ServerList( netadr_t from, sizebuf_t *msg )
 	}
 
 	// serverlist got from masterserver
+	int numMasterServers = 0;
+
 	while( MSG_GetNumBitsLeft( msg ) > 8 )
 	{
 		uint8_t addr[16];
@@ -2677,7 +2699,11 @@ static void CL_ServerList( netadr_t from, sizebuf_t *msg )
 
 		NET_Config( true, false ); // allow remote
 		CL_QueryServer( servadr, proto );
+		numMasterServers++;
 	}
+
+	Con_Printf( "ServerBrowser: master %s returned %d server address(es)\n",
+		NET_AdrToString( from ), numMasterServers );
 
 	CL_NotifyServerListResponse();
 }
