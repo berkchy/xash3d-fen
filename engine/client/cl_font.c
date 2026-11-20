@@ -274,12 +274,7 @@ qboolean Con_LoadTTFFont( const char *fontname, const char *texname, cl_font_t *
 	atlasW = cellW * 16;
 	atlasH = cellH * 16;
 
-	static poolhandle_t font_mempool;
-
-	if( !font_mempool )
-		font_mempool = Mem_AllocPool( "Font Pool" );
-
-	atlas = Mem_Calloc( font_mempool, atlasW * atlasH * 4 );
+	atlas = Mem_Calloc( cls.mempool, atlasW * atlasH * 4 );
 	charset = Cvar_VariableString( "con_charset" );
 
 	for( int i = 0; i < 256; i++ )
@@ -351,7 +346,7 @@ qboolean Con_LoadTTFFont( const char *fontname, const char *texname, cl_font_t *
 	memset( &pic, 0, sizeof( pic ));
 	pic.width = atlasW;
 	pic.height = atlasH;
-	pic.depth = 1;
+	pic.depth = 4;
 	pic.type = PF_RGBA_32;
 	pic.flags = IMAGE_HAS_COLOR|IMAGE_HAS_ALPHA;
 	pic.buffer = atlas;

@@ -333,8 +333,6 @@ typedef struct
 	pfnEventHook	func;	// user-defined function
 } cl_user_event_t;
 
-#define DRC_CMD_MESSAGE		6 // svc_director sub command: director HUD message
-
 #define FONT_FIXED      0
 #define FONT_VARIABLE   1
 
@@ -714,8 +712,6 @@ extern convar_t	cl_levelshot_name;
 extern convar_t	cl_draw_beams;
 extern convar_t	cl_clockreset;
 extern convar_t	hud_fontscale;
-extern convar_t	dhud_scale;
-extern convar_t	dhud_spacing;
 extern convar_t hud_fontrender;
 extern convar_t	hud_scale;
 extern convar_t hud_scale_minimal_width;
@@ -867,8 +863,6 @@ void CL_DrawCenterPrint( void );
 void CL_ClearSpriteTextures( void );
 void CL_HudMessage( const char *pMessage );
 void CL_CenterPrint( const char *text, float y );
-void CL_DirectorMessage_Store( const byte *pbuf, int iSize );
-void CL_DrawDirectorMessages( void );
 client_textmessage_t *CL_TextMessageGet( const char *pName );
 void NetAPI_CancelAllRequests( void );
 model_t *CL_LoadClientSprite( const char *filename );
@@ -1138,7 +1132,6 @@ int Con_UtfMoveLeft( char *str, int pos );
 int Con_UtfMoveRight( char *str, int pos, int length );
 void Con_DefaultColor( int r, int g, int b, qboolean gameui );
 cl_font_t *Con_GetCurFont( void );
-cl_font_t *Con_GetMenuFont( void );
 cl_font_t *Con_GetFont( int num );
 
 // Drawing bridge for the engine-side VGUI2 in client/vgui/vgui2, which is
@@ -1220,8 +1213,6 @@ void UI_ConnectionProgress_Precache( void );
 void UI_ConnectionProgress_Connect( const char *server );
 void UI_ConnectionProgress_ChangeLevel( void );
 void UI_ConnectionProgress_ParseServerInfo( const char *server );
-void UI_ConnectionProgress_StuffText( float flProgress, const char *pszText );
-qboolean UI_HasLoadingDialog( void );
 char **GAME_EXPORT CL_GetFilesList( const char *pattern, int *numFiles, int gamedironly ); // used by both UI and Render APIs
 
 //
