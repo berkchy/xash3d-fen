@@ -447,6 +447,7 @@ typedef struct
 	double			timeout;
 	double			timesend;	// time when request was sended
 	int			flags;	// FNETAPI_MULTIPLE_RESPONSE etc
+	int			challenge;	// GoldSrc query challenge, -1 until received
 } net_request_t;
 
 // new versions of client dlls have a single export with all callbacks
@@ -870,6 +871,7 @@ void CL_CenterPrint( const char *text, float y );
 void CL_DirectorMessage_Store( const byte *pbuf, int iSize );
 void CL_DrawDirectorMessages( void );
 client_textmessage_t *CL_TextMessageGet( const char *pName );
+qboolean CL_NetRequestSend( net_request_t *nr );
 void NetAPI_CancelAllRequests( void );
 model_t *CL_LoadClientSprite( const char *filename );
 model_t *CL_LoadModel( const char *modelname, int *index );

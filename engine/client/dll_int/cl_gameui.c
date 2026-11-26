@@ -98,13 +98,7 @@ void UI_SetActiveMenu( qboolean fActive )
 
 void UI_AddServerToList( netadr_t adr, const char *info )
 {
-	if( !gameui.hInstance )
-	{
-		Con_Printf( "ServerBrowser: UI_AddServerToList skipped (no menu)\n" );
-		return;
-	}
-
-	Con_Printf( "ServerBrowser: UI_AddServerToList %s\n", NET_AdrToString( adr ));
+	if( !gameui.hInstance ) return;
 	gameui.dllFuncs.pfnAddServerToList( adr, info );
 }
 
