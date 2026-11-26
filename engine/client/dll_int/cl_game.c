@@ -901,14 +901,14 @@ CL_DrawLoadingPanel
 The bar texture is optional: SCR_RegisterTextures looks for gfx/loading.bmp
 and gfx/lambda.lmp and quietly keeps zero when neither is in the game files.
 Stretching texture zero leaves the screen blank for the whole level load, so
-draw the panel instead: a label, the bar, and the file being fetched.
+draw the panel instead: the bar and the file being fetched.
 
 scr_download carries a real percentage while a download runs. scr_loading is
 only ever reset to zero and never incremented, so plain loading has no
 honest percentage to show and gets a moving block instead.
 =============
 */
-static void CL_DrawLoadingPanel( const char *label )
+static void CL_DrawLoadingPanel( void )
 {
 	const int bar_width = 320;
 	const int bar_height = 16;
@@ -920,7 +920,6 @@ static void CL_DrawLoadingPanel( const char *label )
 	const float percent = downloading ? bound( 0.0f, scr_download.value, 100.0f ) : 0.0f;
 
 	cl_font_t *font = CL_GetHudFont();
-	const int line = font ? font->charHeight : 16;
 	char info[256];
 
 	if( downloading && host.downloadfile[0] )
@@ -935,15 +934,9 @@ static void CL_DrawLoadingPanel( const char *label )
 		rgba_t color;
 		int width = 0;
 
-		Vector4Set( color, 255, 255, 255, 255 );
-		CL_DrawStringLen( font, label, &width, NULL, FONT_DRAW_HUD );
-		CL_DrawString( CL_AdjustXPos( -1, width, width ), y - line - 6,
-			label, color, font, FONT_DRAW_HUD | FONT_DRAW_UTF8 );
-
 		if( info[0] )
 		{
 			Vector4Set( color, 180, 180, 180, 255 );
-			width = 0;
 			CL_DrawStringLen( font, info, &width, NULL, FONT_DRAW_HUD );
 			CL_DrawString( CL_AdjustXPos( -1, width, width ), y + bar_height + 6,
 				info, color, font, FONT_DRAW_HUD | FONT_DRAW_UTF8 );
@@ -986,7 +979,7 @@ CL_DrawLoading
 draw loading progress bar
 =============
 */
-static void CL_DrawLoadingOrPaused( int tex, const char *label )
+static void CL_DrawLoadingOrPaused( int tex )
 {
 	float	x, y, width, height;
 	int iWidth, iHeight;
@@ -994,7 +987,7 @@ static void CL_DrawLoadingOrPaused( int tex, const char *label )
 	// nothing to stretch, and stretching zero draws nothing at all
 	if( tex <= 0 )
 	{
-		CL_DrawLoadingPanel( label );
+		CL_DrawLoadingPanel();
 		return;
 	}
 
@@ -1056,12 +1049,12 @@ void CL_DrawHUD( int state )
 		{
 			if( !cls.pauseIcon )
 				cls.pauseIcon = SCR_LoadPauseIcon();
-			CL_DrawLoadingOrPaused( Q_max( 0, cls.pauseIcon ), "Paused" );
+			CL_DrawLoadingOrPaused( Q_max( 0, cls.pauseIcon ) );
 		}
 		break;
 	case CL_LOADING:
 		if( !CL_TryClientLoadingPanel() )
-			CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
+			CL_DrawLoadingOrPaused( cls.loadingBar );
 		break;
 	case CL_CHANGELEVEL:
 		// draw_changelevel only marks the first frame, so taking it as the
@@ -1073,7 +1066,7 @@ void CL_DrawHUD( int state )
 		if( cls.draw_changelevel || (!cl.video_prepped && !cl.background) )
 		{
 			if( !CL_TryClientLoadingPanel() )
-				CL_DrawLoadingOrPaused( cls.loadingBar, "Loading" );
+				CL_DrawLoadingOrPaused( cls.loadingBar );
 			cls.draw_changelevel = false;
 		}
 		break;
